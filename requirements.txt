@@ -1,0 +1,23 @@
+# Yêu cầu TỐI THIỂU: không cần cài gì thêm cả — Python 3.8+ là đủ để chạy CLI.
+# Các gói dưới đây là TÙY CHỌN, chỉ cài khi bạn muốn:
+#   - giao diện web (--web)
+#   - chế độ giọng nói (--voice)
+#   - dùng LLM thật (cần cài Ollama riêng, không phải pip)
+
+# Web UI (tùy chọn)
+flask>=2.2
+
+# Voice mode — bản nhẹ nhất, chỉ cần 2 gói dưới:
+SpeechRecognition>=3.10
+pyttsx3>=2.90
+pyaudio>=0.2.13; sys_platform != "darwin"
+
+# Voice mode — chất lượng cao (đòi ~500MB model):
+# openai-whisper>=20231117
+# piper-tts>=1.2
+# sounddevice>=0.4.6
+# soundfile>=0.12
+# numpy>=1.24
+
+# LLM local không dùng pip — cài Ollama từ https://ollama.com rồi:
+#   ollama pull qwen2.5:1.5b

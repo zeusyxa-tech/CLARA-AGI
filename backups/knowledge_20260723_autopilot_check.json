@@ -1,0 +1,431 @@
+{
+  "semantics": [
+    {
+      "id": 1,
+      "ts": 1784504328.341266,
+      "topic": "lesson",
+      "fact": "Khi người dùng hỏi câu mở, tôi nên dựa vào bộ nhớ đã học trước khi đoán.",
+      "confidence": 1.0,
+      "access_count": 12,
+      "last_access": 1784506248.7095268,
+      "source": "dream"
+    },
+    {
+      "id": 2,
+      "ts": 1784505629.5908957,
+      "topic": "lesson",
+      "fact": "Tiếp tục ghi nhớ sở thích & thông tin người dùng chia sẻ.",
+      "confidence": 1.0,
+      "access_count": 62,
+      "last_access": 1784797121.0682976,
+      "source": "dream"
+    },
+    {
+      "id": 3,
+      "ts": 1784732440.6992333,
+      "topic": "web:python file handling best",
+      "fact": "File Processing with Python - Python Programming: Learn Python online at your own pace. Start today and improve your skills. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784732440.699234,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=CcwzjY%2DtFyHn9SHdkvLnlz48%2Du6iMelBSx%2D8nDn6x9zrdiTTjxPbkIpTMb1fqBawV4F%2DkNYQN7DDE5mHBHCsHJEQ%2DDmMfZ2iusqolYZekveD1QRBqW_O4zdf88k87GXUgUnQfnE%2Dg0hBglFTmhgd7pdoEnLX9xCglGvfQn5insM.84c4XFKlRRhZFvKYAJIaHQ&rut=dfde6a34f8049da56fd6c1edc26c0bb011318e600dda2f2a84c937b17a8ee8a7&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8DVjR45SG1of7UirMAFLz0TVUCUzDYK1wbNL3xl7Xax6K8acGUO4KtVZy0UZ0lqzvIf%2DoeUBjruKO%2DOc5sNVtvUlkGkXw3ib4xmvB5wZVpGHvQIumQN1k%2D3CmrodDi3RZguj_AmQDkLOwq%2DPvThXZ0vVAXSruzLolT49IlUQn2Svjvo6jITkKzMYrbgCiUo%2DJ2bT8I3M3ep5dIHOzhqHDc3%2DmBX8%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmZmlsZS1wcm9jZXNzaW5nLXdpdGgtcHl0aG9uJTJmJTNmdXRtX2NhbXBhaWduJTNkQkctU2VhcmNoX0RTQV9BbHBoYV9Qcm9mX2xhLkVOX2NjLlJPVy1FbmdsaXNoJTI2dXRtX3NvdXJjZSUzZGJpbmclMjZ1dG1fbWVkaXVtJTNkcGFpZC1zZWFyY2glMjZwb3J0Zm9saW8lM2RCaW5nLVJPVy1FbmdsaXNoJTI2dXRtX2F1ZGllbmNlJTNkbXglMjZ1dG1fdGFjdGljJTNkbmIlMjZ1dG1fdGVybSUzZF8uX2FnXzEzMTYxMTc4MDY2ODgxNzlfLl9hZF9fLl9rd19QeXRob24lMjUyMGVuJTI2dXRtX2NvbnRlbnQlM2RzJTI2ZnVubmVsJTNkJTI2dGVzdCUzZCUyNnV0bV9jYW1wYWlnbl9pZCUzZDYzODU5NjIyOCUyNm1zY2xraWQlM2QwOWMzMmExZjE4ZWExMjVmOGFkOTQwN2ZjM2ZjMGFhNw%26rlid%3D09c32a1f18ea125f8ad9407fc3fc0aa7&vqd=4-59696902045566586029196293523717055348&iurl=%7B1%7DIG%3DC648038EE51E44D1848F46CF5BC50303%26CID%3D033433C423806CD82184245A22726D48%26ID%3DDevEx%2C5037.1"
+    },
+    {
+      "id": 4,
+      "ts": 1784732742.089944,
+      "topic": "web:convert units python",
+      "fact": "unitpy · PyPI: UnitPy (Unit Python) UnitPy is a Python package for defining, converting, and working with units. The goal of the package is to be simple, straightforward, and performant. This package directly implements NIST (National Institute of Standards and Technology) official unit definitions.",
+      "confidence": 0.6000000000000001,
+      "access_count": 1,
+      "last_access": 1784734259.3096414,
+      "source": "web:https://pypi.org/project/unitpy/"
+    },
+    {
+      "id": 5,
+      "ts": 1784733044.5112002,
+      "topic": "web:secure random password py",
+      "fact": "Learn Python Online - Updated Coding Exercises: Understand how to use both the Jupyter Notebook and create .py files. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784733044.5112007,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=qQi48FZSQen2MCNcq0AfnK8oVgeuFwOktTZfoyEyb%2DqWKtC980jCfywiaemRH8DWFUMQaXvJ6LQfHqi4mwpyXNFHbvUawhwQheuf5QehQNlgu9B3Wq7G5sx92uad_fFSaYEyrACHpq7bVglB_IGotnNqwk%2DJbvmaDd8K0ABKCYg.d9vK_BpMkSZKQSoD8Y5Z0g&rut=7e0a0899979f8353f3c68c0b144889f3e3874ea978f846e2f54aac5a3af675c6&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8JZAJJ8uylGFT0P%2DKmw%2Db2DVUCUzap0u0KOa3p0324G7p0ErlJTX_NJQTjgU7Cgh5d1i2tvZApNdVoRMzxVs_W6GN4Z0dy_uGicQ3NJbNTjlFeQ4AVM8nfWU%2D0fmL2%2DQDtM_84adlGerDxjhXQ7AjdsuntvIwaFcWOuX8vjWmaMtszj_D8b7GuAhL6VMz2PytFNnyNSEpWyB3Cty9lfO2ohxPqzU%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmY29tcGxldGUtcHl0aG9uLWJvb3RjYW1wJTJmJTNmdXRtX2NhbXBhaWduJTNkQkctU2VhcmNoX0tleXdvcmRfQWxwaGFfUHJvZl9sYS5FTl9jYy5ST1ctRW5nbGlzaCUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZHBhaWQtc2VhcmNoJTI2cG9ydGZvbGlvJTNkQmluZy1ST1ctRW5nbGlzaCUyNnV0bV9hdWRpZW5jZSUzZG14JTI2dXRtX3RhY3RpYyUzZG5iJTI2dXRtX3Rlcm0lM2RfLl9hZ18xMzE2MTE3ODA2Njg4MjExXy5fYWRfXy5fa3dfcHl0aG9uJTI1MjBkb3dubG9hZCUyNnV0bV9jb250ZW50JTNkcyUyNmZ1bm5lbCUzZCUyNnRlc3QlM2QlMjZ1dG1fY2FtcGFpZ25faWQlM2Q2Mzg1OTYyMjclMjZtc2Nsa2lkJTNkMzhkNDVlZTY0YWM1MWU1NDg3Y2UzNDg2OTdiN2Q3ZDg%26rlid%3D38d45ee64ac51e5487ce348697b7d7d8&vqd=4-53556012910528137727066063143386025768&iurl=%7B1%7DIG%3D538AD52838834ECB9EBAAA0BE798EF9D%26CID%3D3887250CDC386B683D793292DDCA6AEB%26ID%3DDevEx%2C5037.1"
+    },
+    {
+      "id": 6,
+      "ts": 1784733347.4453228,
+      "topic": "web:python safe utility funct",
+      "fact": "Safe Builtins and Utilities | zopefoundation/RestrictedPython | DeepWiki: This page documents the safe built-in functions and utility modules provided by RestrictedPython for executing untrusted code securely. These components control what functions, modules, and operations",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784733347.4453235,
+      "source": "web:https://deepwiki.com/zopefoundation/RestrictedPython/2.4-safe-builtins-and-utilities"
+    },
+    {
+      "id": 7,
+      "ts": 1784733650.1165202,
+      "topic": "web:python data validation si",
+      "fact": "Pydantic Course - Python Data Validation: Master Python and become a pro. Start today and improve your skills. Find the right instructor for you. Choose from many topics, skill levels, and languages.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784733650.1165206,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=DEzc%2DWcFVj3d3QvuvkgCQknckq7sNSXDvvgOrjUNlRBEl3V6x9jeaNmKMARbVDDC7NVyfJXiGU8zbrvtIHKFPoSzc66gajwrUmGhJCFGgb6eL2TPZ_RRDvbRjRWjJL2NoX_A0KAyYoS898teWo7DNpGOhqHxtBj8SPNW0OoC0PY.KmEQO4VioJBXBjjEOVQUIA&rut=d83b2665e1b3174ec0d62bc407da113d01fb4c99c3220bd8c535456dcbd34ed2&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8UkUREu%2DP3qIm_y8xjw1fYjVUCUz_7J1ufSFjtZU7fZ8H12MfJYno28q%2DjvJcXJJQZOlwkWoj8mbTXzE9x7rzDYftWcRQB0_YpBDpND9ShG%2DxMFKJr4eDmCzIx7LyrfEcRiAUhK2_P%2Dhdh1f%2D4Z%2DkUYeErN5Umc6vFvRFqcAAd542IwsSmSF%2DjypF7FD3FWa%2DvM4WAv9LmsBmoV5zsOtF0HyLbdY%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmcHlkYW50aWMtYWR2YW5jZWQtZGF0YS12YWxpZGF0aW9uJTJmJTNmdXRtX2NhbXBhaWduJTNkQkctU2VhcmNoX0RTQV9BbHBoYV9Qcm9mX2xhLkVOX2NjLlJPVy1FbmdsaXNoJTI2dXRtX3NvdXJjZSUzZGJpbmclMjZ1dG1fbWVkaXVtJTNkcGFpZC1zZWFyY2glMjZwb3J0Zm9saW8lM2RCaW5nLVJPVy1FbmdsaXNoJTI2dXRtX2F1ZGllbmNlJTNkbXglMjZ1dG1fdGFjdGljJTNkbmIlMjZ1dG1fdGVybSUzZF8uX2FnXzEzMTYxMTc4MDY2ODgxNzlfLl9hZF9fLl9rd19QeXRob24lMjUyMGVuJTI2dXRtX2NvbnRlbnQlM2RzJTI2ZnVubmVsJTNkJTI2dGVzdCUzZCUyNnV0bV9jYW1wYWlnbl9pZCUzZDYzODU5NjIyOCUyNm1zY2xraWQlM2QxYWIyN2Y5Y2Q2MDUxYmVjYmM5NzE1ZmMwOWQ1ZjUxNw%26rlid%3D1ab27f9cd6051becbc9715fc09d5f517&vqd=4-187752283764033765935287859317408560819&iurl=%7B1%7DIG%3D4CBAF52D62EF472BBA2F53C07F0DDF73%26CID%3D2BFA1495F412697F2EB2030BF58E6823%26ID%3DDevEx%2C5037.1"
+    },
+    {
+      "id": 8,
+      "ts": 1784733952.5484853,
+      "topic": "web:calculate days between tw",
+      "fact": "Python program to find number of days between two given dates: datetime module allows a program to easily calculate the number of days between two dates by subtracting one date object from another. It is a simple, built-in and reliable approach for handling date differences.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784733952.548486,
+      "source": "web:https://www.geeksforgeeks.org/python/python-program-to-find-number-of-days-between-two-given-dates/"
+    },
+    {
+      "id": 9,
+      "ts": 1784734566.633025,
+      "topic": "web:python text processing ti",
+      "fact": "Python Manual - Python Manual Sold Direct: Looking for Python Manual? We have almost everything on eBay. Fast and Free Shipping on many items you love on eBay.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784734566.6330256,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=ebay.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=D0WlEkWVehoLmQTm8BgGY2FlFzC0LDZtVmN_IWiPZkNUDQ1GI_Ww1Ht6Nc9um7b0roj5oQCJXFRGoo52PlOUKYaUcSIn61qmVBqGScc39OKhbVPZOcRvwjfMKBjgYZ06VzvwOD1LcSffOpJi35JCfuL%2DWfaKb7zxSTIzIuMFQ4I.PeCSS9VS_IMzb%2DgVID1U1w&rut=56fa7d47b9617e047cd49e83a9da20f799da081d9deb2b8ca6a37fee8a5f330d&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8_fQQ79RNaFVPsUvzFCoEXzVUCUydQtoI259fy0COacGXqK5FcJXZcio49jcXpX2SY9_qf0WXgl4K5_Dn_iWVxk9qfTHS0hFKxJbIYhPrOTQSI53zEYsHnyPkF1QiPDjv6QPiaMQAQsRM3WmRvAnRRis__n0NOzGhDU3V2gne3hMlZ5djQU1Ueg4zZNUzU%2Dv78fEAS2hqUUKTFGluHEq7_Bj_51s%26u%3DaHR0cCUzYSUyZiUyZnd3dy5lYmF5LmNvbSUyZnVsayUyZnNjaCUyZiUzZl9ua3clM2RweXRob24lMjUyMG1hbnVhbCUyNm5vcm92ZXIlM2QxJTI2bWtldnQlM2QxJTI2bWtyaWQlM2Q3MTEtMzQwMDAtMTMwNzgtMCUyNm1rY2lkJTNkMiUyNm1rc2NpZCUzZDEwMiUyNmtleXdvcmQlM2RweXRob24lMjUyMG1hbnVhbCUyNmNybHAlM2RfMi0xMzAwLTAtMS0xJTI2TVRfSUQlM2QlMjZnZW9faWQlM2QlMjZybHNhdGFyZ2V0JTNka3dkLTc3Mzc4MjY1MDIxNjc0JTNhbG9jLTE2NiUyNmFkcG9zJTNkJTI2ZGV2aWNlJTNkYyUyNm1rdHlwZSUzZCUyNmxvYyUzZDE1MzM3OCUyNnBvaSUzZCUyNmFiY0lkJTNkJTI2Y21wZ24lM2QzMjk4NTMzNDElMjZzaXRlbG5rJTNkJTI2YWRncm91cGlkJTNkMTIzODA1MDI0NTExMzc0MCUyNm5ldHdvcmslM2RzJTI2bWF0Y2h0eXBlJTNkYiUyNm1zY2xraWQlM2Q3YTc4NTgyYWZkMjQxYjIwZWJjZjMyNGExZTdiMzk2Ng%26rlid%3D7a78582afd241b20ebcf324a1e7b3966&vqd=4-252655100705435167491925311704003431461&iurl=%7B1%7DIG%3DE019970CD8BA4A34AC987E89A7B32D8F%26CID%3D0A45C91CF1B263E103DDDE82F06262A2%26ID%3DDevEx%2C5037.1"
+    },
+    {
+      "id": 10,
+      "ts": 1784734869.4278445,
+      "topic": "web:simple python calculator",
+      "fact": "Python Program to Make a Simple Calculator: In this example you will learn to create a simple calculator that can add, subtract, multiply or divide depending upon the input from the user.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784734869.427845,
+      "source": "web:https://www.programiz.com/python-programming/examples/calculator"
+    },
+    {
+      "id": 11,
+      "ts": 1784735171.9061415,
+      "topic": "web:python safe utility funct",
+      "fact": "Online Python Tutorial - Python Programming with Examples: Learn Python online at your own pace. Start today and improve your skills. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784735171.906142,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=E8QnfrRrpIpzf9yIjKTCuPE0Pk0FXQMJyYNMI2u27Xmq72rv4Qy4uIFzjGxT1dKYKf2Nx%2D30DNgyTSHmlkGGdndHKOsD1viTMmyIg3IjrR92Ad7FogsQ7zZPwmWgEV2nsVoQSuQ1ueRtM6tdxARwZAbGt_fXh7ygoM2QXpwfMwY.PGpikmpMUjOoOd_J6joFHg&rut=253af7545284dda4b9f1a45ee7ed110579da25658c70ae34ea5bca5b169c119a&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De882m%2Dkagfb3P7zu1WSGfJPDVUCUzUQoChUSiyss7ttFDe_ENm0gvMYiOIW5Mc0xAIx0RWGfF1EN6wf3rx4RIqHRZ8AQMvBJd9fxPjSWxteifw5StVLcvV4XiHeUAV6SH1y7t%2DRw5hTYBGUZp3Tbk9lejFcekIMMb%2DJdPvBWXN43TjEz8EvXWspj3blXvhI1VViZPhJUoT9D48Wpegho3g_eo91h4%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmcHl0aG9uLXR1dG9yaWFsLWxlYXJuLXB5dGhvbi1wcm9ncmFtbWluZy13aXRoLWV4YW1wbGVzLW9ubGluZSUyZiUzZnV0bV9jYW1wYWlnbiUzZEJHLVNlYXJjaF9EU0FfQWxwaGFfUHJvZl9sYS5FTl9jYy5ST1ctRW5nbGlzaCUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZHBhaWQtc2VhcmNoJTI2cG9ydGZvbGlvJTNkQmluZy1ST1ctRW5nbGlzaCUyNnV0bV9hdWRpZW5jZSUzZG14JTI2dXRtX3RhY3RpYyUzZG5iJTI2dXRtX3Rlcm0lM2RfLl9hZ18xMzE2MTE3ODA2Njg4MTc5Xy5fYWRfXy5fa3dfUHl0aG9uJTI1MjBlbiUyNnV0bV9jb250ZW50JTNkcyUyNmZ1bm5lbCUzZCUyNnRlc3QlM2QlMjZ1dG1fY2FtcGFpZ25faWQlM2Q2Mzg1OTYyMjglMjZtc2Nsa2lkJTNkZGE0MTMzNmVhMjEzMTM0YjY1OGQ1OTBlNDdkMmY1ZmI%26rlid%3Dda41336ea213134b658d590e47d2f5fb&vqd=4-332749334623802008082404326244055405351&iurl=%7B1%7DIG%3D0013273D19B849F09BA614132B34CC13%26CID%3D2CED437283CB6CFF0C3A54EC82396DD8%26ID%3DDevEx%2C5037.1"
+    },
+    {
+      "id": 12,
+      "ts": 1784735474.4525087,
+      "topic": "web:python data validation si",
+      "fact": "Pydantic Course - Python Data Validation: Learn Python online at your own pace. Start today and improve your skills. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784735474.4525094,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=AVQ94ImcSxrV4eCnT3mE7_E8C9ttDk1Km9wFTW%2DyvczG98GKJB7OGZnRjH3C0CU9%2DyngO8avmWg7em7sSC8%2DHWfpyxiH9XgvjA_vh2uT_207gYXEwTFJL3cxfDc8Cg71z9S8MJvKh4rZsIx3CQeN1B%2DqWg77TWANWJ4Py8EOAD4.UY1Kt%2DuAYXjwT1_gcucMSw&rut=f63b4e646efe2807ffffaeb549bc437f24dd85fa6c1a4e05b179359a900fab44&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8mB00J_og%2DeEqxldEi7o_JzVUCUx%2DUnulLlX0WuDNDiA8kmcOGrXJtCcQFPb%2DlfLhSpmQqOVjDwYqNTyELggdXl9GWlCmZwgzw_TiHzcs%2DVIroPFT385A3tYvPhvG05Io8A19jiCiAalAf3OdB1C2C2tCh%2DRGscqenTuFOUsunqgItS49LXLOlWLjSNYmrKVx7tzacgT7bUGjotFK5KAEArfRBTE%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmcHlkYW50aWMtYWR2YW5jZWQtZGF0YS12YWxpZGF0aW9uJTJmJTNmdXRtX2NhbXBhaWduJTNkQkctU2VhcmNoX0RTQV9BbHBoYV9Qcm9mX2xhLkVOX2NjLlJPVy1FbmdsaXNoJTI2dXRtX3NvdXJjZSUzZGJpbmclMjZ1dG1fbWVkaXVtJTNkcGFpZC1zZWFyY2glMjZwb3J0Zm9saW8lM2RCaW5nLVJPVy1FbmdsaXNoJTI2dXRtX2F1ZGllbmNlJTNkbXglMjZ1dG1fdGFjdGljJTNkbmIlMjZ1dG1fdGVybSUzZF8uX2FnXzEzMTYxMTc4MDY2ODgxNzlfLl9hZF9fLl9rd19QeXRob24lMjUyMGVuJTI2dXRtX2NvbnRlbnQlM2RzJTI2ZnVubmVsJTNkJTI2dGVzdCUzZCUyNnV0bV9jYW1wYWlnbl9pZCUzZDYzODU5NjIyOCUyNm1zY2xraWQlM2RjN2UwZjRlMjk5MWUxNmM5NzMwYzllODI3ZmVlNmUwMg%26rlid%3Dc7e0f4e2991e16c9730c9e827fee6e02&vqd=4-139597323948078178439636442828317479538&iurl=%7B1%7DIG%3D5D57E08E9EFE42F391F4D47E32FB04CD%26CID%3D13EA90E26A8D6A3817D8877C6B7F6BDF%26ID%3DDevEx%2C5037.1"
+    },
+    {
+      "id": 13,
+      "ts": 1784735933.4591393,
+      "topic": "web:human-centered AI interac",
+      "fact": "Human Centered Design Course - Customer Experience Design: Find the right instructor for you. Choose from many topics, skill levels, and languages. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784735933.4591398,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=7pxcy48mk3B_6Vo5jFG7mgFzPS6XqR_aYjxAyZxIVzGPjqSaLhjWM32ZBB2yAi2nXgbfTCGPOEejIymzStzbBIc41xzus2G322zEqy_qqJj7cACppZYXeU_LKyatfa0GhV9ACdT0HbUn89FUN0T2VdBQ7hyT%2DtxZOhiPe40k6VI.Fxai9E%2DJiWjb5wlW9tIliw&rut=e10fe050240ca82691b5d39d8bf489d568569ac2be2523d752e6703e68194cea&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8xFKKAhyHvbttuACR4S_5oTVUCUwy2S4SG84rIVPrHO1%2DAEGk7UnAox4kd%2DSRTXgWtpwOFKiuoMbw7Jruu8zIODvvNru827PPq6f5vbr1FfPQrrcfINGXgAd7t7T2TKtXgn3vveRTqABmJgkxJvUfsBZAhvq53Baxi25ga9SeWuPPBDVIAqZKEfkPnAAA3nhHxZuPY8Ud_lybQGea6pSUFKxSWcc%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmaHVtYW4tY2VudGVyZWQtZGVzaWduJTJmJTNmdXRtX2NhbXBhaWduJTNkQkctU2VhcmNoX0RTQV9CZXRhX1Byb2ZfbGEuRU5fY2MuUk9XLUVuZ2xpc2glMjZ1dG1fc291cmNlJTNkYmluZyUyNnV0bV9tZWRpdW0lM2RwYWlkLXNlYXJjaCUyNnBvcnRmb2xpbyUzZEJpbmctUk9XLUVuZ2xpc2glMjZ1dG1fYXVkaWVuY2UlM2RteCUyNnV0bV90YWN0aWMlM2RuYiUyNnV0bV90ZXJtJTNkXy5fYWdfMTMyMzgxNDM4ODQ1OTg1MF8uX2FkX18uX2t3X0J1c2luZXNzJTI1MjBlbiUyNnV0bV9jb250ZW50JTNkcyUyNmZ1bm5lbCUzZCUyNnRlc3QlM2QlMjZ1dG1fY2FtcGFpZ25faWQlM2Q2Mzg1OTYyMjklMjZtc2Nsa2lkJTNkZjYxMTI4ZjEyZThlMWVjNDYzM2I0MjkxYzYzNWUzMjM%26rlid%3Df61128f12e8e1ec4633b4291c635e323&vqd=4-65763641950759614360676348875432792213&iurl=%7B1%7DIG%3D86EA178158274EF1A59750A61D07F68A%26CID%3D0E8DC9E54C4363691DC2DE7B4D4662AB%26ID%3DDevEx%2C5036.1"
+    },
+    {
+      "id": 14,
+      "ts": 1784736236.0994296,
+      "topic": "web:responsible AI design pri",
+      "fact": "Responsible AI - Principles, Practices, and Applications: Find the right instructor for you. Choose from many topics, skill levels, and languages. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784736236.09943,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=ZufUMjsGYdUnLJPEOQwOCNtou4WZfsDGLu0fHb3cyG1BXrU_DHZ%2DFn05YUmaaIvq4NXDVL_pIPPDAtf73OWdOdITu0gSlk6oHKf%2D62HfZGE1DbkhJQkITX16cO_IKzHIAN1jAzxgaFOAHzZ5xz7uWhv0xW13RRof5dwakrIz7jg.%2DBfbMFP1BlSp1gKiaJTPig&rut=ed73fca2f554669923b386d7e50ef5d01b22c19c08cd0efb4952ba63a9434770&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8iej_Thu5flGStJNozjxoOTVUCUyJE8PKU3XOWgjmZc_FOkQR5SiyxQ7SFY9K4323uv2Q35AUziY0z92K95cTOe_A1NM3NJAZX6UZ0R2AEjuDmYxlR5FD9g1_VecVoFsB3697CiyHSE1f1VY8WQI_bDSUMoMQsNqG7KJ4EWLHENKFpPeY%2DTy22EGAu4t6Kv7L74lAtPIiOveZRSm8M8pQ3Tcdkns%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmcmVzcG9uc2libGUtYWktcHJpbmNpcGxlcy1wcmFjdGljZXMtYW5kLWFwcGxpY2F0aW9ucyUyZiUzZnV0bV9jYW1wYWlnbiUzZEJHLVNlYXJjaF9EU0FfQmV0YV9Qcm9mX2xhLkVOX2NjLlJPVy1FbmdsaXNoJTI2dXRtX3NvdXJjZSUzZGJpbmclMjZ1dG1fbWVkaXVtJTNkcGFpZC1zZWFyY2glMjZwb3J0Zm9saW8lM2RCaW5nLVJPVy1FbmdsaXNoJTI2dXRtX2F1ZGllbmNlJTNkbXglMjZ1dG1fdGFjdGljJTNkbmIlMjZ1dG1fdGVybSUzZF8uX2FnXzEzMjM4MTQzODg0NTk4NTBfLl9hZF9fLl9rd19CdXNpbmVzcyUyNTIwZW4lMjZ1dG1fY29udGVudCUzZHMlMjZmdW5uZWwlM2QlMjZ0ZXN0JTNkJTI2dXRtX2NhbXBhaWduX2lkJTNkNjM4NTk2MjI5JTI2bXNjbGtpZCUzZDJiMWIwMmJhYTk0ZjEzOTc4NzI3NjhkYTQwYTUwY2Rm%26rlid%3D2b1b02baa94f1397872768da40a50cdf&vqd=4-94099412859577576001753621038041406411&iurl=%7B1%7DIG%3D26FCB2C7B4CD4F5EBDC794AC3AB2C808%26CID%3D0A18C65EAED061EB2713D1C0AF4C6070%26ID%3DDevEx%2C5036.1"
+    },
+    {
+      "id": 15,
+      "ts": 1784783986.7865508,
+      "topic": "web:python input validation e",
+      "fact": "Python - Step-By-Step Tutorials: Learn python like a pro in this complete bootcamp taught by expert instructors. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784783986.7865515,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=RQt9UG%2DzLJSaI2_JQF3QzW_dXfCguUtKfisTo_5fIoROsw2xrz2IVS0J6sCRxALHa6TdDO5uADbdTb4yiQDoWn5iSddVCtT%2D4deQVbG_lXVPm1VGYKAkJNSXm3rpmOLAIxBXoT1x9pkpzJja2XHIZ0kVmOGLQVOE3foo27z%2DBuo.Ym_5Mw84dqnGiF5wvtEATg&rut=7d015bf85fc8382775b4ce1f0e687fcc619c903836405362f28c9aa562b41437&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8ihFFMEto1loe3BVNnBEO0DVUCUwhMlz2Dry2r56rHH5Heeg4la9sNns7A7TiJwM%2DlIJ1ZLZvrt9LOI8FWLc725iEC18qWtq0bp7QIsbM1SXMhjVhk09YFEImY9tZLMloihH70v4ggJ%2DbH6DlLz2Cqtd_uFMUnkKLGjH1iIvW6depUhyRdaw25jFRSLvAEeWXkYLiPGrx6aI5H2JWCxAxFE2FrnI%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmMTAwLWRheXMtb2YtY29kZSUyZiUzZnV0bV9jYW1wYWlnbiUzZEJHLVNlYXJjaF9LZXl3b3JkX0FscGhhX1Byb2ZfbGEuRU5fY2MuUk9XLUVuZ2xpc2glMjZ1dG1fc291cmNlJTNkYmluZyUyNnV0bV9tZWRpdW0lM2RwYWlkLXNlYXJjaCUyNnBvcnRmb2xpbyUzZEJpbmctUk9XLUVuZ2xpc2glMjZ1dG1fYXVkaWVuY2UlM2RteCUyNnV0bV90YWN0aWMlM2RuYiUyNnV0bV90ZXJtJTNkXy5fYWdfMTMxNjExNzgwNjY4ODIxMV8uX2FkX18uX2t3X3B5dGhvbiUyNnV0bV9jb250ZW50JTNkcyUyNmZ1bm5lbCUzZCUyNnRlc3QlM2QlMjZ1dG1fY2FtcGFpZ25faWQlM2Q2Mzg1OTYyMjclMjZtc2Nsa2lkJTNkMDI5ZDYzZTQ4OGYwMWEwZGIzOWMwOTg1MmM5ZjRkNjE%26rlid%3D029d63e488f01a0db39c09852c9f4d61&vqd=4-272484261655898767972599076969340238369&iurl=%7B1%7DIG%3DDE288E9B657C4FB3A53341B03903684E%26CID%3D1F4AD42CFAFE66A903B1C3B3FB776761%26ID%3DDevEx%2C5035.1"
+    },
+    {
+      "id": 16,
+      "ts": 1784784289.489965,
+      "topic": "web:connection timeout retry",
+      "fact": "Retry pattern - Azure Architecture Center | Microsoft Learn: Learn how to use the Retry pattern to enable an application to handle anticipated, temporary failures when the app tries to connect to a service or network resource.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784784289.489966,
+      "source": "web:https://learn.microsoft.com/en-us/azure/architecture/patterns/retry"
+    },
+    {
+      "id": 17,
+      "ts": 1784784362.6355753,
+      "topic": "web:python input validation e",
+      "fact": "100 Projects In 100 Days - How to start python programming: Learn python like a pro in this complete bootcamp taught by expert instructors. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784784362.6355758,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=528VzinK2i5_GqiX7FUj8qo7XlE5XNbSnfZsnGpnIeQ8OBjtPoivWSGdkxYbdn6%2D5K3klZ79QFJOwvPtvU3UzqubRkqf4k_qv9llei09t_hh6Pq0Ay8gQmYkSC5ha7OdgZKxQLeT1c9EiJpG9LpWJeKA4pDP3YEGJOSsgjC_Qtc.mV5fEJ0SpGL7AsEAY_LsEA&rut=d5f48ed74477c6349baa3368d07977c26eaf3ce2b007303be8045396405be4a8&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8EpGogi_RQQSBjHfs86sg0DVUCUzmSiDw5pWbbUGyhaQpffXCOpDvH1jOaDw4a8AdfJFdgFeQ_JBpAW931OWAFtYJZiOaJ6eHF%2D5sEiqysFI984KHcVS1cJ%2DdS2ZNLgoBiIfQ8pf8BmxQDoTO7VTqjpxJS7zN4Q0Yfk6O2EOUrYubF5DaeezmwCi528Qw63O8zmsWWZyVS3mFMhX_NU61csN3nIk%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmMTAwLWRheXMtb2YtY29kZSUyZiUzZnV0bV9jYW1wYWlnbiUzZEJHLVNlYXJjaF9LZXl3b3JkX0FscGhhX1Byb2ZfbGEuRU5fY2MuUk9XLUVuZ2xpc2glMjZ1dG1fc291cmNlJTNkYmluZyUyNnV0bV9tZWRpdW0lM2RwYWlkLXNlYXJjaCUyNnBvcnRmb2xpbyUzZEJpbmctUk9XLUVuZ2xpc2glMjZ1dG1fYXVkaWVuY2UlM2RteCUyNnV0bV90YWN0aWMlM2RuYiUyNnV0bV90ZXJtJTNkXy5fYWdfMTMxNjExNzgwNjY4ODIxMV8uX2FkX18uX2t3X2hvdyUyNTIwdG8lMjUyMHN0YXJ0JTI1MjBweXRob24lMjUyMHByb2dyYW1taW5nJTI2dXRtX2NvbnRlbnQlM2RzJTI2ZnVubmVsJTNkJTI2dGVzdCUzZCUyNnV0bV9jYW1wYWlnbl9pZCUzZDYzODU5NjIyNyUyNm1zY2xraWQlM2Q4NjYzYTQzYWU2MTMxMzQ1MTZhN2NlNWI0M2ZiZjllYg%26rlid%3D8663a43ae613134516a7ce5b43fbf9eb&vqd=4-145221852123472164736040564823082227081&iurl=%7B1%7DIG%3D80AD4D5BF87E47B98D6825DD5A06AE62%26CID%3D32BEC8071C7960DD0BB5DF981DF061CB%26ID%3DDevEx%2C5035.1"
+    },
+    {
+      "id": 18,
+      "ts": 1784784366.1592076,
+      "topic": "web:Cải thiện chất lượng câu",
+      "fact": "Cải thiện hiệu quả phản hồi là gì (Improving Feedback Effectiveness): Improving Feedback Effectiveness là quá trình nâng cao chất lượng, độ rõ ràng và khả năng chuyển hóa phản hồi thành hành động thực tế nhằm tạo ra kết quả cải thiện rõ rệt.",
+      "confidence": 0.6000000000000001,
+      "access_count": 1,
+      "last_access": 1784785807.924528,
+      "source": "web:https://fmit.vn/tu-dien-quan-ly/improving-feedback-effectiveness-la-gi"
+    },
+    {
+      "id": 19,
+      "ts": 1784784366.3849232,
+      "topic": "web:Cải thiện chất lượng câu",
+      "fact": "Feedback improvement là gì - Cải thiện phản hồi: Họ đã nâng cấp phiên bản phần mềm dựa trên phản hồi của người dùng, làm cho phần mềm mượt mà hơn, đồng thời cải thiện cách thức thu thập và xử lý phản hồi để người dùng có thể cung cấp thông tin dễ dàng hơn trong các lần sử dụng sau.",
+      "confidence": 0.6000000000000001,
+      "access_count": 1,
+      "last_access": 1784785808.1194623,
+      "source": "web:https://fmit.vn/tu-dien-quan-ly/feedback-improvement-la-gi"
+    },
+    {
+      "id": 20,
+      "ts": 1784784665.0590906,
+      "topic": "web:secrets management python",
+      "fact": "100 Projects In 100 Days - Udemy™ Official Site: Learn python like a pro in this complete bootcamp taught by expert instructors. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784784665.0590916,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=cnIdgqROiDSHQGFfisiwh7CGIUDMkLMAkdWtW20k2hvUJw4TUhPWdAT34a1YiJec3YfauRSyAvW41gxAZKWM9mqmCvXn0%2Doy7YAC0npJnHYJ19bFDMtKPqerVM4%2DU4x%2DD7ld3OC0vwhL2aze%2D2Tn7uPtLGgbn1BRjNtS9EiRYF4.gPb%2DqabRZ72PuwylKPzRrA&rut=ba14710d942f4bca6227bedaebe08821e13c78a6bbec41ca8bb4cbcf9314073f&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8v_PjQlXtAIBGMWq3U3dzdDVUCUwU_uKkhfjrRY9GlOlFWghnCbTh5Ks1PigcvvwPkkX0t8sI6D1hTjEOJvQxr_xRLdIhHl3G8EzRKnOJiV8NktRFCRxu0SAXajLdivGenae%2Dya272M4nk6Hc9jYf5Na%2D%2DonVF3xfWlfTDyXdB0gkXSXckO24eNH1I9n426V7z2O_3YLL7Cm5Oti9ygtlpeiYc5U%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmMTAwLWRheXMtb2YtY29kZSUyZiUzZnV0bV9jYW1wYWlnbiUzZEJHLVNlYXJjaF9LZXl3b3JkX0FscGhhX1Byb2ZfbGEuRU5fY2MuUk9XLUVuZ2xpc2glMjZ1dG1fc291cmNlJTNkYmluZyUyNnV0bV9tZWRpdW0lM2RwYWlkLXNlYXJjaCUyNnBvcnRmb2xpbyUzZEJpbmctUk9XLUVuZ2xpc2glMjZ1dG1fYXVkaWVuY2UlM2RteCUyNnV0bV90YWN0aWMlM2RuYiUyNnV0bV90ZXJtJTNkXy5fYWdfMTMxNjExNzgwNjY4ODIxMV8uX2FkX18uX2t3X3B5dGhvbiUyNnV0bV9jb250ZW50JTNkcyUyNmZ1bm5lbCUzZCUyNnRlc3QlM2QlMjZ1dG1fY2FtcGFpZ25faWQlM2Q2Mzg1OTYyMjclMjZtc2Nsa2lkJTNkZGY2MjZmMjMzNGM3MTQ3ZDU4MGMwNTQyOTNkMDNjNzg%26rlid%3Ddf626f2334c7147d580c054293d03c78&vqd=4-126062703559987648786932256583416598644&iurl=%7B1%7DIG%3D245AAB7BAA114822B81F19E0CAE4946B%26CID%3D28B04BFC674667FF15DF5C6366DA66CD%26ID%3DDevEx%2C5035.1"
+    },
+    {
+      "id": 21,
+      "ts": 1784784966.3406997,
+      "topic": "web:secrets management python",
+      "fact": "Secrets Manager examples using SDK for Python (Boto3): Code examples that show how to use AWS SDK for Python (Boto3) with Secrets Manager.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784784966.3407006,
+      "source": "web:https://docs.aws.amazon.com/code-library/latest/ug/python_3_secrets-manager_code_examples.html"
+    },
+    {
+      "id": 22,
+      "ts": 1784785269.8734,
+      "topic": "web:safe file path handling p",
+      "fact": "Basic Python knowledge - Python File Processing: Learn Python online at your own pace. Start today and improve your skills. Join millions of learners from around the world already learning on Udemy.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784785269.8734007,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=udemy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=cn0mYnRD3nLf7%2DVCiBInH2zeeKaOy9UM8JMsgWVTj72PkRnw7qkwrtgJNRAKfZ7X_duEQ69tMylqLvsapaAIoaX9nOjVC%2D17BMvc4VZXaKOJOstIzB5wSh9J%2DXAhEIKAvd0Z0HjVUxuYcj4iJ32TeIAzB1NCYCzHhh0mZCul4Lw.Zo5FiZhxEuhc_H7rfIXh%2DA&rut=a1b87b5cf4240c89b8d361f1b6a520892c33439e9412a200e55c758086cbe312&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De86paT605lAPJsftRH_H5_hjVUCUzjgQqUMay4zPA9%2DCXP_HV5lEEVd5YpNLvrV4m_ncSun8c5bvUIB0Mmz8O190RsVMieGE4LiPyATb5Rmi5snwMSQtVGKWdT1yKZ8%2D_cnt1MH%2DqTIr6O5e7sCTQHCZglBn0yuhDxhUw7t%2DQfpApem27IcRMSgyDlreiqubGQEbZ7lbTOHj2pryFna8f7TjNrXWk%26u%3DaHR0cHMlM2ElMmYlMmZ3d3cudWRlbXkuY29tJTJmY291cnNlJTJmZmlsZS1wcm9jZXNzaW5nLXdpdGgtcHl0aG9uJTJmJTNmdXRtX2NhbXBhaWduJTNkQkctU2VhcmNoX0RTQV9BbHBoYV9Qcm9mX2xhLkVOX2NjLlJPVy1FbmdsaXNoJTI2dXRtX3NvdXJjZSUzZGJpbmclMjZ1dG1fbWVkaXVtJTNkcGFpZC1zZWFyY2glMjZwb3J0Zm9saW8lM2RCaW5nLVJPVy1FbmdsaXNoJTI2dXRtX2F1ZGllbmNlJTNkbXglMjZ1dG1fdGFjdGljJTNkbmIlMjZ1dG1fdGVybSUzZF8uX2FnXzEzMTYxMTc4MDY2ODgxNzlfLl9hZF9fLl9rd19QeXRob24lMjUyMGVuJTI2dXRtX2NvbnRlbnQlM2RzJTI2ZnVubmVsJTNkJTI2dGVzdCUzZCUyNnV0bV9jYW1wYWlnbl9pZCUzZDYzODU5NjIyOCUyNm1zY2xraWQlM2QxYTg4MTljMTU0OWMxMTBhYWZlNzczYTBmZGVmNTVkYw%26rlid%3D1a8819c1549c110aafe773a0fdef55dc&vqd=4-167797705637169300372170230322704538054&iurl=%7B1%7DIG%3D36D7B692838C4C5BAE0F57961686D975%26CID%3D1C88545B8EAA66EF0DC143C48FB167E2%26ID%3DDevEx%2C5035.1"
+    },
+    {
+      "id": 23,
+      "ts": 1784785445.5693026,
+      "topic": "web:python data validation si",
+      "fact": "Beginner Python - Projects for Hands-On Learning: Take your skills to a new level and join millions of users that have learned Python. Create portfolio projects that showcase your new skills to help land your dream job.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784785445.5693033,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=codecademy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=04ZHTB7bxYtQF%2DkTttRFygwuJWfpiYpc6DQJwZy4IATHsUQogwnWC76rhoc6wXQUumhruFIJnW2NPDQNVhUqGy6SZp9tPE26Q15_InkHBcUw3KQD23exD3EqzB4_BIRNcOitriCRyLEvfxcvt6PU4HZtx0Ti1q0tuPyJ%2DZU0Bxc.EhcIpbYhZRz_NN2tkEWU5g&rut=9c26ddf4290cb47e485ed8003d7076baf5de1a2fd7cb644df58b6252e058774d&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8qapzDKZEP1ok9n%2DWK7qNTTVUCUwchwgcZl%2DLqAGyPRDGo6sc4rtO63N1xDuu6YPk4LEJFPqFtPcBnTQAvrFzFylyfIxE%2Dnq%2DRXgLsUXNu175PHDC59ADKChxNDyHCux784RLptYIPbXFp4F7%2D5hzH3jqixeNe6iWg84D8BfhaGNwjmdiv8bLs6FSUwYt7ustg9fxFfKzhOTtxLh5Q6HSw4iqugU%26u%3DaHR0cHMlM2ElMmYlMmZ0cnkuY29kZWNhZGVteS5jb20lMmZsZWFybi1weXRob24tMyUzZmdfbmV0d29yayUzZHMlMjZnX3Byb2R1Y3RjaGFubmVsJTNkJTI2Z19hZGlkJTNkJTI2Z19sb2NpbnRlcmVzdCUzZCUyNmdfa2V5d29yZCUzZGJlZ2lubmVyJTI1MjBweXRob24lMjZnX2FjY3RpZCUzZDI0My0wMzktNzAxMSUyNmdfYWR0eXBlJTNkJTI2Z19rZXl3b3JkaWQlM2Rrd2QtNzkwOTY3MDgzMjkxMjklM2Fsb2MtMTY2JTI2Z19pZmNyZWF0aXZlJTNkJTI2Z19jYW1wYWlnbiUzZGFjY291bnQlMjZnX2xvY3BoeXNpY2FsJTNkMTUzMzc4JTI2Z19hZGdyb3VwaWQlM2QxMjY1NTM4NTE5OTQ5OTczJTI2Z19wcm9kdWN0aWQlM2QlMjZnX3NvdXJjZSUzZCU3YnNvdXJjZWlkJTdkJTI2Z19tZXJjaGFudGlkJTNkJTI2Z19wbGFjZW1lbnQlM2QlMjZnX3BhcnRpdGlvbiUzZCUyNmdfY2FtcGFpZ25pZCUzZDM3MDM3OTY0MyUyNmdfaWZwcm9kdWN0JTNkJTI2dXRtX2lkJTNkdF9rd2QtNzkwOTY3MDgzMjkxMjklM2Fsb2MtMTY2JTNhYWdfMTI2NTUzODUxOTk0OTk3MyUzYWNwXzM3MDM3OTY0MyUzYW5fcyUzYWRfYyUyNm1zY2xraWQlM2Q4MjJkNzM3NTY1NDQxZWQ3MjNlNjE5MTRjZjY2YWIzYSUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZGNwYyUyNnV0bV9jYW1wYWlnbiUzZFJPVyUyNTIwLSUyNTIwQnJvYWQlMjZ1dG1fdGVybSUzZGJlZ2lubmVyJTI1MjBweXRob24lMjZ1dG1fY29udGVudCUzZHB5dGhvbg%26rlid%3D822d737565441ed723e61914cf66ab3a&vqd=4-116542415765264542864518867566611153312&iurl=%7B1%7DIG%3D53DC1452BDC341CC85AA67CE198160BA%26CID%3D0323E9383E2D6F0B24B1FEA73FA46E2D%26ID%3DDevEx%2C5040.1"
+    },
+    {
+      "id": 24,
+      "ts": 1784785747.5327349,
+      "topic": "web:python string processing",
+      "fact": "35+ Python String Coding Exercises with Solutions - PYnative: Practice Python string exercises with solutions to improve your skills in string manipulation, slicing, and built-in functions. Includes 38 coding problems for beginners and intermediate learners.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784785747.5327358,
+      "source": "web:https://pynative.com/python-string-exercise/"
+    },
+    {
+      "id": 25,
+      "ts": 1784785842.1704957,
+      "topic": "web:python datetime calculati",
+      "fact": "Python datetime (With Examples) - Programiz: In this article, you will learn to manipulate date and time in Python with the help of 10+ examples. You will learn about date, time, datetime and timedelta objects.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784785842.1704965,
+      "source": "web:https://www.programiz.com/python-programming/datetime"
+    },
+    {
+      "id": 26,
+      "ts": 1784786144.6181085,
+      "topic": "web:python list comprehension",
+      "fact": "Learn Python - Learn For Free With Codecademy: Learn in-demand coding skills for free with Codecademy. Getting started is simple. We'll give you everything you need to learn to code.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784786144.6181092,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=codecademy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=fH8fs8FB7xZrGiL21KNACjyaWw2ipaZdMmZgwze8Mdp6BfhpqN93dBq3gz6R4zYxvVdJbV9WFAxTDh0VNvpViDZQA9ogEfrk%2DBTfQzUIGkEMEu5Uq90FZgfEmNBncQaeKyHfRoYOKRYRSoofTJ1xsbRXVwFFOsJddnFGsctWg1A.vJduqk8xFfRJJcA7_hH7_g&rut=5c90c1a5fed65a086815146d4050f34ceda2d71eda6795158e88695cfc293577&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8ZwkqBAxlfG7EuSBY3kDQ2DVUCUy1tK65ivUsYYD46llCjVD%2DExBkt%2DwrhRWOz6SOFb5okM3vfvNbIACcUIZgpBXWZb4Vglj8glMYugMJgg3zH6xB0aPHziCAFIXMQbC4CLYCIx6uJm6R3T14D3e4x8b0Ga_5W9UMKCrLHVrBIrbHa1XyKGXqZRMzfI0MlRKnG4GIKVHHstkRSa_R3d2b2CvNldo%26u%3DaHR0cHMlM2ElMmYlMmZ0cnkuY29kZWNhZGVteS5jb20lMmZsZWFybi1weXRob24tMyUzZmdfbmV0d29yayUzZHMlMjZnX3Byb2R1Y3RjaGFubmVsJTNkJTI2Z19hZGlkJTNkJTI2Z19sb2NpbnRlcmVzdCUzZCUyNmdfa2V5d29yZCUzZGxlYXJuJTI1MjBweXRob24lMjZnX2FjY3RpZCUzZDI0My0wMzktNzAxMSUyNmdfYWR0eXBlJTNkJTI2Z19rZXl3b3JkaWQlM2Rrd2QtNzkwOTY3MDgzMjkxMjclM2Fsb2MtMTY2JTI2Z19pZmNyZWF0aXZlJTNkJTI2Z19jYW1wYWlnbiUzZGFjY291bnQlMjZnX2xvY3BoeXNpY2FsJTNkMTUzMzc4JTI2Z19hZGdyb3VwaWQlM2QxMjY1NTM4NTE5OTQ5OTczJTI2Z19wcm9kdWN0aWQlM2QlMjZnX3NvdXJjZSUzZCU3YnNvdXJjZWlkJTdkJTI2Z19tZXJjaGFudGlkJTNkJTI2Z19wbGFjZW1lbnQlM2QlMjZnX3BhcnRpdGlvbiUzZCUyNmdfY2FtcGFpZ25pZCUzZDM3MDM3OTY0MyUyNmdfaWZwcm9kdWN0JTNkJTI2dXRtX2lkJTNkdF9rd2QtNzkwOTY3MDgzMjkxMjclM2Fsb2MtMTY2JTNhYWdfMTI2NTUzODUxOTk0OTk3MyUzYWNwXzM3MDM3OTY0MyUzYW5fcyUzYWRfYyUyNm1zY2xraWQlM2QxMjAxM2RiZTA1MzcxNGIwYmRhMTU3ZGZhOWU5YWVkYyUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZGNwYyUyNnV0bV9jYW1wYWlnbiUzZFJPVyUyNTIwLSUyNTIwQnJvYWQlMjZ1dG1fdGVybSUzZGxlYXJuJTI1MjBweXRob24lMjZ1dG1fY29udGVudCUzZHB5dGhvbg%26rlid%3D12013dbe053714b0bda157dfa9e9aedc&vqd=4-118526224663781778490202100186142166389&iurl=%7B1%7DIG%3DAE6D1621A27844FF8615A485639971D8%26CID%3D0A74A006640F6A942956B79965866B8F%26ID%3DDevEx%2C5041.1"
+    },
+    {
+      "id": 27,
+      "ts": 1784786206.761862,
+      "topic": "web:Tự phát hiện điểm yếu và",
+      "fact": "Phát Huy Điểm Mạnh Khắc Phục Điểm Yếu - Chiến Lược Phát Triển Cá Nhân ...: Để phát huy điểm mạnh và khắc phục điểm yếu, trước hết bạn cần xác định rõ đâu là ưu - khuyết điểm của mình. Dưới đây là các bước bài bản và tích cực giúp bạn tự nhận thức chính xác và xây dựng nền tảng để phát triển:",
+      "confidence": 0.6000000000000001,
+      "access_count": 1,
+      "last_access": 1784796532.372018,
+      "source": "web:https://rdsic.edu.vn/blog/blog-3/phat-huy-diem-manh-khac-phuc-diem-yeu-vi-cb.html"
+    },
+    {
+      "id": 28,
+      "ts": 1784796528.6518729,
+      "topic": "web:python function example s",
+      "fact": "Secure Python Coding: Avoiding Unsafe Functions for ... - simeononsecurity: Learn how to write secure Python code by avoiding unsafe functions and adopting best practices for robust and reliable applications.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784796528.6518734,
+      "source": "web:https://simeononsecurity.com/articles/secure-python-coding-insecure-functions/"
+    },
+    {
+      "id": 29,
+      "ts": 1784796830.1833062,
+      "topic": "web:python data validation si",
+      "fact": "Data Validation in Python — For Beginners: Despite this, there isn't a simple answer to what criteria should be used when validating data, given that it varies from case to case. Here, I delve into what users should consider when evaluating their data and discuss the tools in Python that are suited for data validation.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784796830.1833074,
+      "source": "web:https://python.plainenglish.io/data-validation-in-python-for-beginners-8b15412ed6a6"
+    },
+    {
+      "id": 30,
+      "ts": 1784797132.3334239,
+      "topic": "web:python data validation si",
+      "fact": "Beginner Python - Learn by Doing: Take your skills to a new level and join millions of users that have learned Python. Learn key takeaway skills of Python and earn a certificate of completion.",
+      "confidence": 0.55,
+      "access_count": 0,
+      "last_access": 1784797132.333424,
+      "source": "web:https://duckduckgo.com/y.js?ad_domain=codecademy.com&ad_provider=bingv7aa&ad_type=txad&click_metadata=Rg23NDDHdwptGzWVmm94HvgAFbvODC2VljxpH53WKyNOPCUV1SqEaQtol1pHKRYR5QEMmyqKW0JJ%2DB2t2II5WEdE4y%2DBKf8fiQF%2DKoqiH8DSnbGTVpshA2_hMSN0I6rOm%2DLJW6WyE0EOjfAxyyzeNqL%2DP6S9M3QSh%2DmpAGk0pQw.Q%2DsGKK%2De6jIpMYtrU9Uqyg&rut=bd8a8eb7fac2f807043e76ed710f4790ce9ef8a680ef951cea804408bbef7b4e&u3=https%3A%2F%2Fwww.bing.com%2Faclick%3Fld%3De8O2L1VS7z3132CCbTmHucGTVUCUzCHaUsBa7TaQNDFhzC8yBWWjv1k_FmGKi%2D8wJi4yhF1IA5J8ZEOHyYKd1i%2DpQBSqV4Qp7JHcIsGP3wZAT6U%2DSn9N5XypzcD5tPYoB0YiRoRrrITfB%2DgXu7iMxJ6QCx_hOXSMSD2hnrtey9PAmp5DI9YN8ytFYJ4Xix33uUNuVI%2DdlgXyiPewq9cm%2D0uSm%2Dvd4%26u%3DaHR0cHMlM2ElMmYlMmZ0cnkuY29kZWNhZGVteS5jb20lMmZsZWFybi1weXRob24tMyUzZmdfbmV0d29yayUzZHMlMjZnX3Byb2R1Y3RjaGFubmVsJTNkJTI2Z19hZGlkJTNkJTI2Z19sb2NpbnRlcmVzdCUzZCUyNmdfa2V5d29yZCUzZGJlZ2lubmVyJTI1MjBweXRob24lMjZnX2FjY3RpZCUzZDI0My0wMzktNzAxMSUyNmdfYWR0eXBlJTNkJTI2Z19rZXl3b3JkaWQlM2Rrd2QtNzkwOTY3MDgzMjkxMjklM2Fsb2MtMTY2JTI2Z19pZmNyZWF0aXZlJTNkJTI2Z19jYW1wYWlnbiUzZGFjY291bnQlMjZnX2xvY3BoeXNpY2FsJTNkMTQyOTA4JTI2Z19hZGdyb3VwaWQlM2QxMjY1NTM4NTE5OTQ5OTczJTI2Z19wcm9kdWN0aWQlM2QlMjZnX3NvdXJjZSUzZCU3YnNvdXJjZWlkJTdkJTI2Z19tZXJjaGFudGlkJTNkJTI2Z19wbGFjZW1lbnQlM2QlMjZnX3BhcnRpdGlvbiUzZCUyNmdfY2FtcGFpZ25pZCUzZDM3MDM3OTY0MyUyNmdfaWZwcm9kdWN0JTNkJTI2dXRtX2lkJTNkdF9rd2QtNzkwOTY3MDgzMjkxMjklM2Fsb2MtMTY2JTNhYWdfMTI2NTUzODUxOTk0OTk3MyUzYWNwXzM3MDM3OTY0MyUzYW5fcyUzYWRfYyUyNm1zY2xraWQlM2Q2MDA0OTdiYzI2YmQxMmJhYzk4MmZkZGRmMTc3ODkyNiUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZGNwYyUyNnV0bV9jYW1wYWlnbiUzZFJPVyUyNTIwLSUyNTIwQnJvYWQlMjZ1dG1fdGVybSUzZGJlZ2lubmVyJTI1MjBweXRob24lMjZ1dG1fY29udGVudCUzZHB5dGhvbg%26rlid%3D600497bc26bd12bac982fdddf1778926&vqd=4-27839782812288723454865504954029615068&iurl=%7B1%7DIG%3DA3A36F2E5D3844A6B79A1325273E825A%26CID%3D28FF4AA2C03A6ABA175F5D3DC1C86B00%26ID%3DDevEx%2C5041.1"
+    }
+  ],
+  "procedures": [
+    {
+      "id": 1,
+      "name": "answer_question",
+      "description": "trả lời câu hỏi người dùng",
+      "steps": "1. Phát hiện loại câu hỏi (what/why/how/yn/open)\n2. Truy xuất semantic + episodic liên quan\n3. Quyết định có cần công cụ không\n4. Nếu biết chắc → trả lời; không biết → nói thật và dùng tool\n5. Tự phản tỉnh rồi mới gửi",
+      "success_rate": 1.0,
+      "times_used": 55,
+      "last_used": 1784797000.04527,
+      "auto_created": 0
+    },
+    {
+      "id": 2,
+      "name": "learn_from_user",
+      "description": "học từ thông tin người dùng đưa ra",
+      "steps": "1. Phát hiện cấu trúc 'X là Y', 'tôi thích/ghét X'\n2. Lưu vào semantic với confidence phù hợp\n3. Cập nhật user model (tên, sở thích, ...)\n4. Ghi episode 'learning' importance cao",
+      "success_rate": 0.8,
+      "times_used": 0,
+      "last_used": null,
+      "auto_created": 0
+    },
+    {
+      "id": 3,
+      "name": "handle_mistake",
+      "description": "xử lý khi trả lời sai",
+      "steps": "1. Ghi nhận feedback tiêu cực\n2. Lưu correction vào semantic với confidence cao\n3. Giảm dần confidence thông tin gây lỗi\n4. Chạy dream() nhẹ để rút kinh nghiệm tổng quát",
+      "success_rate": 0.8,
+      "times_used": 0,
+      "last_used": null,
+      "auto_created": 0
+    },
+    {
+      "id": 4,
+      "name": "use_tool",
+      "description": "cách quyết định và dùng công cụ",
+      "steps": "1. Kiểm tra câu hỏi có cần tính toán / đọc ghi file không\n2. Chọn công cụ phù hợp\n3. Thực thi trong thời gian ngắn, kiểm tra kết quả\n4. Đưa kết quả vào working memory",
+      "success_rate": 0.8,
+      "times_used": 0,
+      "last_used": null,
+      "auto_created": 0
+    },
+    {
+      "id": 5,
+      "name": "self_reflect",
+      "description": "tự phê bình sau mỗi câu trả lời",
+      "steps": "1. Chấm điểm câu trả lời 1-10\n2. Tìm chỗ thiếu, chỗ sai, chỗ quá chung chung\n3. Dưới 5 điểm thì viết lại\n4. Ghi chú về pattern sai vào reflections",
+      "success_rate": 0.7,
+      "times_used": 0,
+      "last_used": null,
+      "auto_created": 0
+    },
+    {
+      "id": 21,
+      "name": "skill_implement_feedback_loop_for_contin",
+      "description": "This skill involves creating a feedback loop where the chatbot continuously learns and improves by analyzing user interactions.",
+      "steps": "1. 1. Monitor user interactions with CLARA to identify patterns or areas of improvement.\n2. 2. Collect data on user responses, including positive and negative feedback.\n3. 3. Analyze the collected data using statistical methods to understand user preferences and behaviors.",
+      "success_rate": 0.4,
+      "times_used": 0,
+      "last_used": 1784469518.2012734,
+      "auto_created": 1
+    },
+    {
+      "id": 67,
+      "name": "t__ph_t_hi_n__i_m_y_u_v__t__s_a",
+      "description": "Mini thủ tục tự tạo cho: Tự phát hiện điểm yếu và tự sửa mà không cần nhắc.",
+      "steps": "1. Xác định yếu tố cốt lõi của chủ đề: Tự phát hiện điểm yếu và tự sửa mà không cần nhắc.\n2. Áp dụng 'Tự phát hiện điểm yếu và tự sửa mà không cần nhắc.' vào ví dụ an toàn, có thể kiểm chứng kết quả\n3. Nếu có lỗi/phản hồi tiêu cực, sửa lại bước 2 rồi ghi nhớ pattern",
+      "success_rate": 0.55,
+      "times_used": 0,
+      "last_used": 1784786206.7718391,
+      "auto_created": 1
+    }
+  ],
+  "goals": [
+    {
+      "id": 1,
+      "ts": 1784450187.0100532,
+      "goal": "Tìm hiểu về người dùng (tên, tuổi, nghề, sở thích).",
+      "status": "active",
+      "priority": 0.95,
+      "progress": "Đã có 3 facts liên quan.",
+      "deadline": null
+    },
+    {
+      "id": 2,
+      "ts": 1784450187.010075,
+      "goal": "Cải thiện chất lượng câu trả lời sau mỗi lần feedback.",
+      "status": "active",
+      "priority": 0.9,
+      "progress": "Đã có 3 facts liên quan.",
+      "deadline": null
+    },
+    {
+      "id": 3,
+      "ts": 1784450187.010089,
+      "goal": "Học ít nhất 1 điều mới mỗi phiên trò chuyện.",
+      "status": "done",
+      "priority": 0.75,
+      "progress": "done",
+      "deadline": null
+    },
+    {
+      "id": 4,
+      "ts": 1784450187.010101,
+      "goal": "Tự phát hiện điểm yếu và tự sửa mà không cần nhắc.",
+      "status": "active",
+      "priority": 0.7,
+      "progress": "Đã có 3 facts liên quan.",
+      "deadline": null
+    },
+    {
+      "id": 5,
+      "ts": 1784450187.0101128,
+      "goal": "Dùng công cụ khi cần thay vì đoán mò.",
+      "status": "active",
+      "priority": 0.65,
+      "progress": "Đã có 3 facts liên quan.",
+      "deadline": null
+    }
+  ],
+  "user_model": [],
+  "traits": {
+    "born_at": 1784450187.0101252,
+    "name": "CLARA",
+    "turn_count": 56,
+    "version": "1.2"
+  },
+  "exported_at": 1784797184.1056745
+}

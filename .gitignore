@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.bak
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/autopilot*.log
+data/export_*.json
+skills_custom/_pending/*.py
+workspace/*
+!workspace/.gitkeep
