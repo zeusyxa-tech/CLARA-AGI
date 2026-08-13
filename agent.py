@@ -408,6 +408,10 @@ class ClarasAGI:
                 "  export            xuất toàn bộ kiến thức ra file JSON\n"
                 "  nhớ: X là Y       dạy kiến thức mới\n"
                 "  tốt / tệ vì ...   feedback để tôi học\n"
+                "  check <chủ đề>    kiểm tra compliance/income\n"
+                "  income_roadmap <status|add_focus|add_action|complete_action|set_execution_plan|clear>|<args>\n"
+                "  income_focus <set_path|add_target|log|block_path|status>|<args>\n"
+                "  income_opportunity_finder <query>   quét cơ hội thu nhập phù hợp\n"
                 "  quit              thoát\n"
                 "Công cụ tôi tự dùng khi cần: calc, now, read, write, list, run_python, search"
             )
@@ -470,6 +474,25 @@ class ClarasAGI:
 
         if any(low.startswith(w) for w in ("tốt","tệ","sai","hay","good","bad","ok","đúng","kém")) and len(low) < 200:
             return self.feedback(text)
+        if low.startswith("income_roadmap "):
+            try:
+                from skills_custom.active.income_roadmap import run as run_income_roadmap
+                return run_income_roadmap(self, text[len("income_roadmap "):])
+            except Exception as e:
+                return f"❌ Lỗi income_roadmap: {e}"
+        if low.startswith("income_focus "):
+            try:
+                from skills_custom.active.income_focus import run as run_income_focus
+                return run_income_focus(self, text[len("income_focus "):])
+            except Exception as e:
+                return f"❌ Lỗi income_focus: {e}"
+        if low.startswith("income_opportunity_finder ") or low.startswith("opportunity "):
+            try:
+                from skills_custom.active.income_opportunity_finder import run as run_income_opp
+                arg = text[len("income_opportunity_finder "):] if low.startswith("income_opportunity_finder ") else text[len("opportunity "):]
+                return run_income_opp(self, arg)
+            except Exception as e:
+                return f"❌ Lỗi opportunity scan: {e}"
         return None
 
     def _help_text(self):
