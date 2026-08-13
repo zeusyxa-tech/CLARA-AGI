@@ -365,6 +365,25 @@ class ClarasAGI:
         if low.startswith("goal "):
             self.mem.add_goal(text[5:].strip(), priority=0.7)
             return "🎯 Đã thêm mục tiêu mới."
+        if low == "compliance":
+            try:
+                from compliance import compliance_report, load_owner_policy
+                topic = text[len("compliance"):].strip() or "dịch vụ AI giúp người và doanh nghiệp nhỏ tại Việt Nam"
+                report = compliance_report(topic, load_owner_policy())
+                return json.dumps(report, ensure_ascii=False, indent=2)
+            except Exception as e:
+                return f"❌ Lỗi compliance: {e}"
+        if low.startswith("check "):
+            try:
+                from compliance import compliance_report, load_owner_policy
+                topic = low[6:].strip()
+                if not topic:
+                    return "Dùng: check <chủ đề kiếm tiền hoặc nghiệp vụ>"
+                report = compliance_report(topic, load_owner_policy())
+                short = ["compliance: " + topic, f"legit_income=" + str(report["legit_income"]), f"owner_aligned=" + str(report["owner_aligned"]), f"income_score=" + str(report["income_score"]), f"jurisdiction=" + str(report.get("jurisdiction_priority","")), f"locked=" + str(report.get("locked",False))]
+                return "\n".join(short)
+            except Exception as e:
+                return f"❌ Lỗi check: {e}"
         if low.startswith("forget "):
             q = text[7:].strip()
             sems = self.mem.recall_semantics(q, limit=3)

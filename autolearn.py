@@ -136,6 +136,9 @@ class AutoLearner:
         question = self.agi._clean(question)
         question = re.sub(r"^(câu hỏi:|hỏi:)", "", question, flags=re.I).strip()
         if not question or len(question) < 8: return
+        if not self._is_compliant(question):
+            self._log("bỏ qua self-qa không phù hợp chính sách")
+            return
         # tự trả lời (giả lập user input)
         ans = self.agi.chat(question)
         ans_clean = ans.split("\n⏱️")[0]
@@ -151,6 +154,14 @@ class AutoLearner:
             self.agi.mem.learn("inferred", ans_clean[:200], confidence=0.4, source="self_qa")
         self.stats["self_qa"] += 1
         self._log(f"tự hỏi: {question[:60]}... → {score}/10")
+
+    def _is_compliant(self, text: str) -> bool:
+        try:
+            from compliance import is_aligned_with_owner, is_legit_income, load_owner_policy
+            p = load_owner_policy()
+            return is_aligned_with_owner(text, p) and is_legit_income(text, p)
+        except Exception:
+            return True
 
     def _act_dream(self):
         """Ngủ mơ: tổng hợp ký ức gần đây thành bài học."""

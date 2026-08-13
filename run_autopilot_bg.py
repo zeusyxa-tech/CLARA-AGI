@@ -59,6 +59,7 @@ def _run():
     )
     from self_improve import research
     from self_improve_loop import SelfImprovementLoop
+    from compliance import compliance_report, is_aligned_with_owner as _compliance_aligned, is_legit_income
 
     policy = load_policy()
     owner_policy = load_owner_policy()
@@ -133,19 +134,24 @@ def _run():
                     print(f"[autopilot] skip unethical topic: {topic}", flush=True)
                     day += 1
                     continue
-                if not is_aligned_with_owner(topic, owner_policy):
-                    print(f"[autopilot] skip owner-misaligned topic: {topic}", flush=True)
+                owner_policy_local = owner_policy
+                comp = compliance_report(topic, owner_policy_local)
+                if not comp["owner_aligned"] or not comp["legit_income"]:
+                    print(f"[autopilot] skip misaligned topic: {topic}", flush=True)
                     day += 1
                     continue
 
                 result = research(agi, topic, max_pages=1)
+                score = comp["income_score"]
+                if not score:
+                    score = _score_topic(topic, policy)
                 try:
                     agi.mem.log_research(
                         topic=topic,
                         source="curriculum",
                         result_summary=str(result)[:200],
                         usefulness=score,
-                        harm=not is_aligned_with_owner(topic, owner_policy),
+                        harm=not comp["owner_aligned"],
                     )
                 except TypeError:
                     agi.mem.log_research(
@@ -155,7 +161,7 @@ def _run():
                         usefulness=score,
                     )
                 agi.mem.mark_topic_done(topic)
-                print(f"[autopilot] learned: {topic}", flush=True)
+                print(f"[autopilot] learned: {topic} (score={score:.2f})", flush=True)
             except Exception as e:
                 print(f"[autopilot] research err: {e}", flush=True)
             for _ in range(args["research_interval"]):

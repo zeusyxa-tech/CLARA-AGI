@@ -193,6 +193,16 @@ class SelfImprovementLoop:
         except Exception as e:
             self._log(f"research err: {e}")
 
+        # Compliance check before skill proposal
+        try:
+            from compliance import compliance_report, load_owner_policy
+            report = compliance_report(topic, load_owner_policy())
+            if not report["legit_income"] or not report["owner_aligned"]:
+                self._log(f"skip non-compliant topic: {topic}")
+                return
+        except Exception:
+            pass
+
         # Cố đề xuất skill nếu model đủ mạnh
         tried_skill = False
         try:

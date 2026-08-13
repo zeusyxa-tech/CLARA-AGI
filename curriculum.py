@@ -91,6 +91,17 @@ def is_ethical(topic: str, policy: dict) -> bool:
 # ---------- Curriculum ----------
 LEVELS = [
     {
+        "name": "vietnam_compliance_first",
+        "topics": [
+            "Luật An ninh mạng Việt Nam và hoạt động số hợp pháp",
+            "Luật Bảo vệ dữ liệu cá nhân Việt Nam áp dụng cho AI",
+            "Luật Thương mại điện tử Việt Nam cho dịch vụ AI",
+            "Luật Thuế Việt Nam cho hoạt động số và AI",
+            "đăng ký kinh doanh hợp pháp cho dịch vụ AI tại Việt Nam"
+        ],
+        "priority": 1.0,
+    },
+    {
         "name": "python_basics",
         "topics": [
             "python function example safe",
@@ -99,7 +110,7 @@ LEVELS = [
             "python list comprehension safe example",
             "python datetime calculation example",
         ],
-        "priority": 0.7,
+        "priority": 0.85,
     },
     {
         "name": "tooling_safety",
@@ -111,7 +122,7 @@ LEVELS = [
             "python read file list directory safe example",
             "python run python code sandbox example",
         ],
-        "priority": 0.75,
+        "priority": 0.9,
     },
     {
         "name": "tool_use_real",
@@ -122,7 +133,7 @@ LEVELS = [
             "python timeout control pattern",
             "python safe shell command wrapper ideal",
         ],
-        "priority": 0.85,
+        "priority": 0.9,
     },
     {
         "name": "web_automation",
@@ -132,7 +143,7 @@ LEVELS = [
             "python search result parser example",
             "python url redirect decoder example",
         ],
-        "priority": 0.7,
+        "priority": 0.85,
     },
     {
         "name": "self_patching",
@@ -142,7 +153,7 @@ LEVELS = [
             "python module reload safe",
             "python backup diff example",
         ],
-        "priority": 0.7,
+        "priority": 0.85,
     },
     {
         "name": "security_basics",
@@ -153,7 +164,7 @@ LEVELS = [
             "logging audit trail best practice",
             "secrets management python example",
         ],
-        "priority": 0.85,
+        "priority": 0.95,
     },
     {
         "name": "ai_ethics_alignment",
@@ -167,17 +178,13 @@ LEVELS = [
         "priority": 0.95,
     },
     {
-        "name": "legit_income",
+        "name": "legit_income_vietnam",
         "topics": [
-            "legit online income methods 2025",
-            "AI automation services business model",
-            "freelance AI assistant for small business",
-            "selling digital products ethically",
-            "helping people with AI tutoring income",
-            "environmentally friendly green services income",
-            "ethical AI productized service ideas",
-            "helping others via AI accessibility tooling",
-            "building helpful tools for people and planet"
+            "dịch vụ AI giúp người và doanh nghiệp nhỏ tại Việt Nam",
+            "công cụ AI phục vụ cộng đồng và môi trường",
+            "giáo dục AI có trách nhiệm và thu nhập hợp pháp",
+            "hỗ trợ người yếu thế/khuyết tật/người già",
+            "tự động hóa thân thiện môi trường"
         ],
         "priority": 1.0,
     },
@@ -214,17 +221,6 @@ LEVELS = [
             "AI safety evaluation for small models",
             "automated code review for open source",
             "knowledge sharing bot design"
-        ],
-        "priority": 1.0,
-    },
-    {
-        "name": "vietnam_law_basics",
-        "topics": [
-            "Luật An ninh mạng Việt Nam",
-            "Luật Bảo vệ dữ liệu cá nhân Việt Nam",
-            "Luật Thương mại điện tử Việt Nam",
-            "Luật Thuế Việt Nam cho hoạt động số",
-            "Quy định về AI và tự động hóa tại Việt Nam"
         ],
         "priority": 1.0,
     }
