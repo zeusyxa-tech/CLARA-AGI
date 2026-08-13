@@ -412,6 +412,7 @@ class ClarasAGI:
                 "  income_roadmap <status|add_focus|add_action|complete_action|set_execution_plan|clear>|<args>\n"
                 "  income_focus <set_path|add_target|log|block_path|status>|<args>\n"
                 "  income_opportunity_finder <query>   quét cơ hội thu nhập phù hợp\n"
+                "  income_portfolio <add_platform|add_project|add_proposal|add_bounty|status|export>|<args>\n"
                 "  quit              thoát\n"
                 "Công cụ tôi tự dùng khi cần: calc, now, read, write, list, run_python, search"
             )
@@ -493,6 +494,12 @@ class ClarasAGI:
                 return run_income_opp(self, arg)
             except Exception as e:
                 return f"❌ Lỗi opportunity scan: {e}"
+        if low.startswith("income_portfolio "):
+            try:
+                from skills_custom.active.income_portfolio import run as run_income_portfolio
+                return run_income_portfolio(self, text[len("income_portfolio "):])
+            except Exception as e:
+                return f"❌ Lỗi income_portfolio: {e}"
         return None
 
     def _help_text(self):

@@ -23,6 +23,7 @@ SKILLS_MANIFEST = {
     "income_roadmap": {"kind": "active", "desc": "legit income roadmap tracker", "module": "skills_custom.active.income_roadmap", "run": "run"},
     "income_opportunity_finder": {"kind": "active", "desc": "scan compliant income opportunities", "module": "skills_custom.active.income_opportunity_finder", "run": "run"},
     "income_focus": {"kind": "active", "desc": "choose and execute income focus with compliance", "module": "skills_custom.active.income_focus", "run": "run"},
+    "income_portfolio": {"kind": "active", "desc": "track income portfolio/proposals/bounties", "module": "skills_custom.active.income_portfolio", "run": "run"},
     "web_scraping": {"kind": "docs", "desc": "scrape", "file": "skills_custom/catalog/web_scraping.md"},
     "web_search": {"kind": "docs", "desc": "search", "file": "skills_custom/catalog/web_search.md"},
     "web_fetch": {"kind": "docs", "desc": "fetch", "file": "skills_custom/catalog/web_fetch.md"},

@@ -25,6 +25,54 @@ except Exception:
     _HAS_COMPLIANCE = False
 
 ROOT = Path(__file__).resolve().parents[2]
+LEADS_FILE = ROOT / "workspace" / "income_leads.json"
+
+
+def _load_json(path, default):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return default
+
+
+def _save_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _now_iso():
+    return __import__("datetime").datetime.now().isoformat()
+
+
+def _append_lead(item):
+    leads = _load_json(LEADS_FILE, {"leads": []})
+    item["ts"] = _now_iso()
+    item["status"] = item.get("status") or "new"
+    leads["leads"].append(item)
+    if len(leads["leads"]) > 200:
+        leads["leads"] = leads["leads"][-200:]
+    _save_json(LEADS_FILE, leads)
+    return item
+
+
+def _list_leads(status=None, limit=20):
+    leads = _load_json(LEADS_FILE, {"leads": []})
+    items = leads.get("leads", [])
+    if status:
+        items = [x for x in items if x.get("status") == status]
+    return items[-limit:]
+
+
+def _update_lead_status(url, status):
+    leads = _load_json(LEADS_FILE, {"leads": []})
+    for item in leads.get("leads", []):
+        if item.get("url") == url:
+            item["status"] = status
+            item["updated_at"] = _now_iso()
+            break
+    _save_json(LEADS_FILE, leads)
 
 
 def _default_queries():
@@ -107,6 +155,47 @@ def _search(queries, max_results=5):
 
 def run(agi, text: str) -> str:
     text = text.strip()
+    sub = text.split("|")[0].strip().lower() if "|" in text else (text or "").lower()
+    arg = text.split("|", 1)[1].strip() if "|" in text else ""
+
+    if sub == "leads":
+        status = arg or None
+        items = _list_leads(status=status, limit=20)
+        if not items:
+            return "📭 Chưa có lead nào được lưu."
+        lines = [f"📋 Income leads: {len(items)}"]
+        for it in items:
+            lines.append(f"- [{it.get('status','new')}] {it.get('title','')} | {it.get('url','')}")
+        return "\n".join(lines)
+
+    if sub == "save":
+        topic = arg or text
+        owner_policy = load_owner_policy() if _HAS_COMPLIANCE else {}
+        queries = [topic]
+        raw_results, _ = _search(queries, max_results=4)
+        results, _ = _filter_compliant(raw_results, owner_policy)
+        saved = 0
+        for r in results[:5]:
+            item = {
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "snippet": r.get("snippet", ""),
+                "source_topic": topic,
+                "status": "new",
+            }
+            _append_lead(item)
+            saved += 1
+        return f"✅ Đã lưu {saved} lead(s) cho: {topic}"
+
+    if sub == "update":
+        if not arg or "|" not in arg:
+            return "Dùng: income_opportunity_finder:update|<url>|<status>"
+        url, status = arg.split("|", 1)
+        url = url.strip()
+        status = status.strip()
+        _update_lead_status(url, status)
+        return f"✅ Updated lead status: {url} -> {status}"
+
     topic = text or "legitimate AI income opportunities 2025"
     owner_policy = load_owner_policy() if _HAS_COMPLIANCE else {}
 
