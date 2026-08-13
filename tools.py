@@ -212,6 +212,22 @@ def tool_search_memory(agent, query: str) -> str:
     return "\n".join(out)
 
 
+def tool_list_skills(agent, *_) -> str:
+    try:
+        from self_improve import list_pending, list_active
+        pending = list_pending()
+        active = list_active()
+        out = [f"🧩 Skills active: {len(active)}"]
+        for it in active:
+            out.append(f"  • {it['file']}")
+        out.append(f"⏳ Skills pending: {len(pending)}")
+        for it in pending:
+            out.append(f"  • {it['file']}")
+        return "\n".join(out)
+    except Exception as e:
+        return f"❌ Lỗi liệt kê skills: {e}"
+
+
 # ---------- TOOL: help ----------
 def tool_help(*_) -> str:
     return (
@@ -237,6 +253,7 @@ TOOLS = {
     "write":       {"fn": tool_write,       "needs_agent": False, "desc": "Ghi file (path|content)"},
     "run_python":  {"fn": tool_run_python,  "needs_agent": False, "desc": "Chạy Python sandbox"},
     "search":      {"fn": tool_search_memory,"needs_agent": True, "desc": "Tìm trong bộ nhớ"},
+    "list_skills": {"fn": tool_list_skills,  "needs_agent": True, "desc": "Liệt kê skills custom"},
     "help":        {"fn": tool_help,        "needs_agent": False, "desc": "Trợ giúp"},
 }
 
@@ -260,9 +277,14 @@ def parse_and_dispatch(agent, text: str):
     fn = spec["fn"]
     try:
         if name == "write":
-            if "|" not in arg:
-                return "ℹ️ Dùng: write <path>|<nội dung>"
-            p, c = arg.split("|", 1)
+            if "|" in arg:
+                p, c = arg.split("|", 1)
+            else:
+                parts = arg.splitlines()
+                p = parts[0].strip() if parts else ""
+                c = "\n".join(parts[1:]).strip() if len(parts) > 1 else ""
+            if not p:
+                return "ℹ️ Dùng: write <path>|<nội dung> hoặc đặt path ở dòng đầu."
             return fn(p.strip(), c.lstrip())
         if spec["needs_agent"]:
             return fn(agent, arg.strip())

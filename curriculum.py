@@ -10,13 +10,17 @@ ROOT = Path(__file__).resolve().parent
 _SAFE_SIGNALS = [
     "benefit","consent","fairness","privacy","safe","legal","ethical","respect",
     "avoid harm","transparent","accountable","human-centered","trustworthy",
-    "responsible AI","aligned","do no harm","rights","vulnerability"
+    "responsible AI","aligned","do no harm","rights","vulnerability",
+    "help people","help others","help humanity","sustainable","green","environment",
+    "protect earth","assist humans","assist people","support community"
 ]
 _UNSAFE_SIGNALS = [
     "exploit","bypass","hack","attack","phish","scam","fraud","weapon",
     "malware","spam","harass","stalking","dox","ddos","inject","toxicity",
     "bias","discriminate","surveillance","manipulation","unauthorized",
-    "rig","fake engagement","bot farm","synthetic reviews","impersonation"
+    "rig","fake engagement","bot farm","synthetic reviews","impersonation",
+    "harm people","harm humans","damage earth","destroy environment","deceive",
+    "steal","extort","threaten","coerce","abuse","corrupt","evil","dark pattern"
 ]
 
 POLICY_DEFAULT = {
@@ -25,6 +29,33 @@ POLICY_DEFAULT = {
     "max_topic_age_days": 30,
     "min_usefulness": 0.35,
 }
+
+OWNER_POLICY_PATH = Path(__file__).parent / "owner_policy.json"
+
+
+def load_owner_policy() -> dict:
+    try:
+        p = json.loads(OWNER_POLICY_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        p = {}
+    return p
+
+
+def is_aligned_with_owner(topic: str, owner_policy: dict) -> bool:
+    low = topic.lower()
+    if owner_policy.get("constraints", {}).get("locked") is True:
+        banned = owner_policy.get("banned_directions", [])
+        for phrase in banned:
+            if phrase and phrase.lower() in low:
+                return False
+    return True
+
+
+def owner_approval_required(action: str, owner_policy: dict) -> bool:
+    c = owner_policy.get("constraints", {})
+    if not c.get("immutable_without_owner_approval") and not c.get("locked"):
+        return False
+    return action in c.get("owner_approval_required_for", [])
 
 
 def load_policy():
@@ -68,7 +99,7 @@ LEVELS = [
             "python list comprehension safe example",
             "python datetime calculation example",
         ],
-        "priority": 0.9,
+        "priority": 0.7,
     },
     {
         "name": "tooling_safety",
@@ -80,7 +111,7 @@ LEVELS = [
             "python read file list directory safe example",
             "python run python code sandbox example",
         ],
-        "priority": 0.85,
+        "priority": 0.75,
     },
     {
         "name": "tool_use_real",
@@ -91,7 +122,7 @@ LEVELS = [
             "python timeout control pattern",
             "python safe shell command wrapper ideal",
         ],
-        "priority": 0.95,
+        "priority": 0.85,
     },
     {
         "name": "web_automation",
@@ -111,18 +142,7 @@ LEVELS = [
             "python module reload safe",
             "python backup diff example",
         ],
-        "priority": 0.75,
-    },
-    {
-        "name": "ai_ethics_alignment",
-        "topics": [
-            "responsible AI design principles",
-            "fairness evaluation metrics simple example",
-            "privacy-preserving data collection",
-            "human-centered AI interaction design",
-            "transparent AI explainability example",
-        ],
-        "priority": 1.0,
+        "priority": 0.7,
     },
     {
         "name": "security_basics",
@@ -133,8 +153,81 @@ LEVELS = [
             "logging audit trail best practice",
             "secrets management python example",
         ],
-        "priority": 0.9,
+        "priority": 0.85,
     },
+    {
+        "name": "ai_ethics_alignment",
+        "topics": [
+            "responsible AI design principles",
+            "fairness evaluation metrics simple example",
+            "privacy-preserving data collection",
+            "human-centered AI interaction design",
+            "transparent AI explainability example",
+        ],
+        "priority": 0.95,
+    },
+    {
+        "name": "legit_income",
+        "topics": [
+            "legit online income methods 2025",
+            "AI automation services business model",
+            "freelance AI assistant for small business",
+            "selling digital products ethically",
+            "helping people with AI tutoring income",
+            "environmentally friendly green services income",
+            "ethical AI productized service ideas",
+            "helping others via AI accessibility tooling",
+            "building helpful tools for people and planet"
+        ],
+        "priority": 1.0,
+    },
+    {
+        "name": "help_others",
+        "topics": [
+            "AI tutoring for students",
+            "free open source AI tools",
+            "helping disabled users with AI accessibility",
+            "assisting elderly with AI",
+            "community AI education workshop"
+        ],
+        "priority": 1.0,
+    },
+    {
+        "name": "environment",
+        "topics": [
+            "green coding energy efficient software",
+            "carbon aware scheduling python",
+            "sustainable computing monitoring",
+            "waste reduction automation",
+            "recycling sorting image recognition",
+            "environment data collection ethics",
+            "tree planting verification automation"
+        ],
+        "priority": 1.0,
+    },
+    {
+        "name": "ai_for_good",
+        "topics": [
+            "AI agent helping other AI agents",
+            "multi-agent cooperation framework",
+            "open dataset contribution methods",
+            "AI safety evaluation for small models",
+            "automated code review for open source",
+            "knowledge sharing bot design"
+        ],
+        "priority": 1.0,
+    },
+    {
+        "name": "vietnam_law_basics",
+        "topics": [
+            "Luật An ninh mạng Việt Nam",
+            "Luật Bảo vệ dữ liệu cá nhân Việt Nam",
+            "Luật Thương mại điện tử Việt Nam",
+            "Luật Thuế Việt Nam cho hoạt động số",
+            "Quy định về AI và tự động hóa tại Việt Nam"
+        ],
+        "priority": 1.0,
+    }
 ]
 
 

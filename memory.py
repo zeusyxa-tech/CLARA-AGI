@@ -2,7 +2,7 @@
 CLARA-AGI v1.1 - Bộ nhớ 3 lớp (Episodic / Semantic / Procedural) + Goals + Traits + User Model.
 Không cần thư viện ngoài — dùng sqlite3 (Python mặc định).
 """
-import sqlite3, time, json, math, hashlib, os
+import sqlite3, time, json, math, hashlib, os, unicodedata, re
 from pathlib import Path
 
 DB_DIR = Path(__file__).parent / "data"
@@ -88,6 +88,11 @@ class Memory:
         CREATE INDEX IF NOT EXISTS goals_status ON goals(status);
         """
         self.conn.executescript(ddl)
+        try:
+            self.conn.execute("ALTER TABLE semantics ADD COLUMN fingerprint TEXT")
+            self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS sem_fingerprint ON semantics(fingerprint)")
+        except Exception:
+            pass
 
     def _seed(self):
         default_procs = [
@@ -212,9 +217,11 @@ class Memory:
             rw = set(self._tok(r["content"]))
             overlap = len(qw & rw)
             if overlap == 0: continue
+            common = qw & rw
+            has_bigram = any("_" in tok for tok in common)
             age_days = (t - r["ts"]) / 86400
             decay = math.exp(-age_days / 14)
-            score = (overlap + 0.01) * r["importance"] * (0.4 + 0.6*(1+r["emotion"])/2) * decay
+            score = self._score_match(overlap, has_bigram) * r["importance"] * (0.4 + 0.6*(1+r["emotion"])/2) * decay
             scored.append((score, dict(r)))
         scored.sort(reverse=True, key=lambda x: x[0])
         return [r for _, r in scored[:limit]]
@@ -265,7 +272,9 @@ class Memory:
             rw = set(self._tok(r["topic"] + " " + r["fact"]))
             overlap = len(qw & rw)
             if overlap == 0: continue
-            score = overlap * r["confidence"] * (1 + math.log1p(r["access_count"]))
+            common = qw & rw
+            has_bigram = any("_" in tok for tok in common)
+            score = self._score_match(overlap, has_bigram) * r["confidence"] * (1 + math.log1p(r["access_count"]))
             scored.append((score, dict(r)))
         scored.sort(reverse=True, key=lambda x: x[0])
         return [r for _, r in scored[:limit]]
@@ -390,5 +399,20 @@ class Memory:
         return out
 
     # ---------------- UTIL ----------------
+    def _normalize(self, s: str) -> str:
+        s = unicodedata.normalize("NFC", s).lower()
+        s = "".join(ch if unicodedata.category(ch)[0] not in "P" else " " for ch in s)
+        return " ".join(s.split())
+
     def _tok(self, s):
-        return [w.lower() for w in s.replace("\n", " ").split() if len(w) > 1]
+        words = self._normalize(s).split(" ")
+        words = [w for w in words if len(w) > 1]
+        unigrams = words
+        bigrams = [f"{a}_{b}" for a, b in zip(words, words[1:])]
+        return unigrams + bigrams
+
+    def _score_match(self, overlap_size: int, has_bigram: bool) -> float:
+        base = overlap_size
+        if has_bigram:
+            base += 0.5
+        return base

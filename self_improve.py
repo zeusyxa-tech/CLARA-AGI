@@ -220,6 +220,36 @@ def load_custom_skills(agi):
     return loaded
 
 
+def reload_skills(agi):
+    """Reload custom skills from disk and refresh TOOLS without restarting."""
+    import importlib.util
+    from tools import TOOLS
+    reloaded = []
+    roots = [ACTIVE_DIR, CUSTOM_SKILLS_DIR]
+    for root in roots:
+        for p in sorted(root.glob("*.py")):
+            if p.name == "__init__.py":
+                continue
+            tool_name = f"custom_{p.stem}"
+            old = TOOLS.pop(tool_name, None)
+            try:
+                spec = importlib.util.spec_from_file_location(tool_name, str(p))
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                if hasattr(mod, "run"):
+                    _register_custom_tool(agi, p.stem, mod)
+                    reloaded.append(p.name)
+            except Exception as e:
+                if old is not None:
+                    TOOLS[tool_name] = old
+                try:
+                    agi.mem.remember_episode("skill_error",
+                        f"Lỗi reload skill {p.name}: {e}", importance=0.6, emotion=-0.3)
+                except Exception:
+                    pass
+    return reloaded
+
+
 def _register_custom_tool(agi, name, module):
     """Đăng ký skill custom thành tool mà agent có thể gọi."""
     from tools import TOOLS

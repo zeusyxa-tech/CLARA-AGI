@@ -36,7 +36,7 @@ class ClarasAGI:
         self.traits = {
             "name": self.mem.get_trait("name", "CLARA"),
             "version": self.mem.get_trait("version", "1.0"),
-            "born_at": self.mem.get_trait("born_at", time.time()),
+            "born_at": float(self.mem.get_trait("born_at", time.time()) or time.time()),
             "curiosity": self.mem.get_trait("curiosity", 0.7),
             "honesty": self.mem.get_trait("honesty", 0.9),
             "empathy": self.mem.get_trait("empathy", 0.6),
@@ -160,6 +160,34 @@ class ClarasAGI:
                     self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
                 except Exception as e:
                     tool_result = f"❌ {e}"
+
+        # multi-step tool loop: up to 2 extra tool calls if needed
+        for _ in range(2):
+            if tool_used == "none":
+                break
+            next_prompt = (
+                f"Người dùng: {text}\n"
+                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
+                f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
+                "Nếu kết quả công cụ trên chưa đủ để trả lời, hãy chọn công cụ tiếp theo cần thiết. "
+                "Chỉ trả về MỘT dòng: '<tool_name> <args>' hoặc 'none'."
+            )
+            next_raw = self.brain.think("__TOOL__", next_prompt, temperature=0.1, num_predict=120)
+            m = re.search(r"^(calc|read|write|list|run_python|search|now|help|none)\s+(.*)", next_raw.strip(), re.S | re.I)
+            if not m:
+                break
+            next_tool = m.group(1).lower()
+            next_args = m.group(2).strip()
+            if next_tool == "none":
+                break
+            try:
+                tool_result = parse_and_dispatch(self, f"{next_tool} {next_args}")
+                tool_used = next_tool
+                self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
+            except Exception as e:
+                tool_result = f"❌ {e}"
+                tool_used = "none"
+                break
 
         # 7. ANSWER
         ans_prompt = (
@@ -478,7 +506,9 @@ class ClarasAGI:
                     if isinstance(step, dict) and step.get("tool_name"):
                         tool_candidates.append(step)
                     elif isinstance(step, str) and " " in step.strip():
-                        tool_candidates.append({"tool_name": step.split()[0], "tool_args": step.split(None, 1)[1]})
+                        step_tool = step.split()[0].lower()
+                        if step_tool in {"calc","read","write","list","run_python","search","now","help","none"}:
+                            tool_candidates.append({"tool_name": step_tool, "tool_args": step.split(None, 1)[1]})
             tool_name = "none"
             tool_args = ""
             if tool_candidates:
@@ -500,17 +530,30 @@ class ClarasAGI:
 
     def _forced_tool(self, text):
         low = text.lower()
-        # calc rõ ràng
+        text = text.strip()
+        # write: path|content or path content
+        if low.startswith("write "):
+            arg = text[6:].strip()
+            if "|" in arg.splitlines()[0]:
+                return f"write {arg}"
+            parts = arg.splitlines()[0].split(None, 1)
+            if len(parts) == 2:
+                return f"write {parts[0].strip()}|{parts[1].strip()}"
+            return f"write {arg}"
+        # direct tool syntax: toolname args
+        m = re.match(r"^(calc|read|write|list|run_python|search|now|help|python)\s+(.*)", text, re.I | re.S)
+        if m:
+            return f"{m.group(1).lower()} {m.group(2).strip()}"
+        # calc
         if re.search(r"^\s*tính\s+", low):
-            expr = re.sub(r"^\s*tính\s+", "", text)
-            expr = expr.strip("?").strip()
+            expr = re.sub(r"^\s*tính\s+", "", text).strip("?.").strip()
             if re.match(r"^[\d\s\.\+\-\*\/\(\)\^%]+$", expr):
                 return f"calc {expr}"
         if re.search(r"\d\s*[\+\-\*\/\^]\s*\d", text) and not re.search(r"[a-zA-Zà-ỹÀ-Ỵ]", text.split("?")[0]):
-            # cả dòng là biểu thức
             m = re.search(r"[\d\s\.\+\-\*\/\(\)\^%]+", text)
             if m: return f"calc {m.group(0).strip()}"
-        if re.search(r"(mấy giờ|giờ gì|ngày mấy|hôm nay)", low):
+        # now
+        if re.search(r"(mấy giờ|giờ gì|ngày mấy|hôm nay)\b", low):
             return "now"
         return None
 

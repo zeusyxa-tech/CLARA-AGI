@@ -2,7 +2,8 @@
 CLARA-AGI v1.1 - Brain abstraction.
 Hỗ trợ: Ollama local (tự nhận), fallback là MicroLLM (template, chạy được mọi máy).
 """
-import json, urllib.request, re, time, os
+import json, urllib.request, re, time, os, hashlib, unicodedata
+from pathlib import Path
 
 DEFAULT_OLLAMA = "qwen2.5:1.5b"
 CANDIDATE_MODELS = [
@@ -11,6 +12,8 @@ CANDIDATE_MODELS = [
     "mistral:7b",
 ]
 OLLAMA_URL = os.environ.get("CLARA_OLLAMA_URL", "http://localhost:11434")
+OPENAI_API_BASE = (os.environ.get("OPENAI_API_BASE") or "").rstrip("/") or f"{OLLAMA_URL}/v1"
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "ollama")
 
 
 # ---------------- OLLAMA ----------------
@@ -33,6 +36,39 @@ def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, n
     with urllib.request.urlopen(req, timeout=120) as resp:
         j = json.loads(resp.read())
     return (j.get("response") or "").strip()
+
+
+# ---------------- OPENAI-COMPATIBLE ----------------
+def openai_chat(prompt, model=DEFAULT_OLLAMA, base_url=OPENAI_API_BASE, api_key=OPENAI_API_KEY,
+                temperature=0.5, num_predict=400):
+    url = f"{base_url}/chat/completions"
+    payload = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": num_predict,
+    }).encode()
+    req = urllib.request.Request(url, data=payload,
+                                 headers={
+                                     "Content-Type": "application/json",
+                                     "Authorization": f"Bearer {api_key}",
+                                 })
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        j = json.loads(resp.read())
+    choice = (((j.get("choices") or [{}])[0]).get("message") or {})
+    return (choice.get("content") or "").strip()
+
+
+# ---------------- COMMON POST ----------------
+_THINK_RE = re.compile(r"<think>.*?</think>", re.S)
+
+
+def strip_think(text: str) -> str:
+    if not text:
+        return ""
+    return _THINK_RE.sub("", text).strip()
 
 
 # ---------------- TASK TAGS ----------------
@@ -317,16 +353,26 @@ class Brain:
 
     def think(self, tag, prompt, **kw):
         t = kw.get("temperature", self.temperature)
+        out = ""
         if self.backend == "ollama":
             sys_prompt = self._tag_to_system(tag)
             full = f"{sys_prompt}\n{prompt}"
             try:
                 out = ollama_chat(full, model=self.model, temperature=t,
                                   num_predict=kw.get("num_predict", 400))
-                if out and len(out.strip()) > 2:
-                    return out.strip()
             except Exception as e:
-                return f"[ollama lỗi: {e}]\n" + self.micro.think(tag, prompt)
+                out = f"[ollama lỗi: {e}]\n"
+        elif self.backend == "openai":
+            sys_prompt = self._tag_to_system(tag)
+            full = f"{sys_prompt}\n{prompt}"
+            try:
+                out = openai_chat(full, model=self.model, temperature=t,
+                                  num_predict=kw.get("num_predict", 400))
+            except Exception as e:
+                out = f"[openai lỗi: {e}]\n"
+        out = strip_think(out)
+        if out and len(out.strip()) > 2:
+            return out.strip()
         return self.micro.think(tag, prompt)
 
     def _tag_to_system(self, tag):
