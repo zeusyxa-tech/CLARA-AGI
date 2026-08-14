@@ -1,14 +1,8 @@
 """
-CLARA-AGI v1.1 - Global Workspace Agent (9-step cognitive cycle).
-Features:
-  • 9 bước: PERCEIVE → RETRIEVE → FEEL → PLAN → CHOOSE TOOL → ACT → ANSWER → REFLECT → CONSOLIDATE
-  • Self-reflection & rewriting khi điểm thấp
-  • Theory of Mind (mô hình người dùng)
-  • Dream/consolidation khi rảnh (tự động sau mỗi N tin nhắn)
-  • Auto-skill-creation khi gặp lỗi lặp lại
-  • Emotion tagging, uncertainty, curiosity
+CLARA-AGI v1.3 - Global Workspace Agent (9-step cognitive cycle).
 """
 import re, json, time, math, random
+from pathlib import Path
 from memory import Memory
 from brain import Brain, T_ANSWER, T_PLAN, T_TOOL, T_REFLECT, T_REWRITE, T_SKILL, T_DREAM
 from tools import parse_and_dispatch
@@ -29,20 +23,19 @@ class ClarasAGI:
     def __init__(self, force_micro=False, model=None, dream_every=10, auto_skill=True):
         self.mem = Memory()
         self.brain = Brain(force_micro=force_micro, model=model)
-        self.wm = []  # working memory (global workspace)
+        self.wm = []
         self.dream_every = dream_every
         self.auto_skill = auto_skill
         self.turn_count = self.mem.get_trait("turn_count", 0) or 0
         self.traits = {
             "name": self.mem.get_trait("name", "CLARA"),
-            "version": self.mem.get_trait("version", "1.0"),
+            "version": self.mem.get_trait("version", "1.3"),
             "born_at": float(self.mem.get_trait("born_at", time.time()) or time.time()),
             "curiosity": self.mem.get_trait("curiosity", 0.7),
             "honesty": self.mem.get_trait("honesty", 0.9),
             "empathy": self.mem.get_trait("empathy", 0.6),
             "verbosity": self.mem.get_trait("verbosity", 0.5),
         }
-        # chào hỏi nếu là lần đầu
         self.first_run = self.mem.stats()["episodes"] == 0
         self._study = None
         if _HAS_SCHEDULER:
@@ -52,13 +45,8 @@ class ClarasAGI:
                 self._study.start()
             except Exception:
                 pass
-
-        # nạp 21 kỹ năng Hermes-style
-        try:
-            import skills_custom
-            skills_custom.load_all(self)
-        except Exception:
-            pass
+        self._command_registry = {}
+        self._init_command_registry()
 
     # ------------------ CORE CYCLE ------------------
     def chat(self, user_text: str) -> str:
@@ -69,7 +57,6 @@ class ClarasAGI:
         if not text:
             return "Bạn chưa nói gì 😊"
 
-        # lệnh đặc biệt (xử ngay, không qua vòng AGI)
         special = self._handle_special_commands(text)
         if special is not None:
             return special
@@ -121,7 +108,7 @@ class ClarasAGI:
         plan = self._parse_plan(plan_raw)
         self.wm.append({"role": "plan", "content": plan})
 
-        # 5-6. TOOL + ACT (with minimal retry loop)
+        # 5-6. TOOL + ACT
         tool_result = ""
         tool_used = "none"
         tool_args = plan.get("tool_args") or ""
@@ -144,7 +131,6 @@ class ClarasAGI:
                 except Exception as e:
                     tool_result = f"❌ {e}"
 
-        # minimal retry: if brain hesitated, ask it once more strictly for ONE tool command
         if tool_used == "none":
             retry_prompt = (
                 f"Người dùng yêu cầu dùng tool: {text}\n"
@@ -161,7 +147,6 @@ class ClarasAGI:
                 except Exception as e:
                     tool_result = f"❌ {e}"
 
-        # multi-step tool loop: up to 2 extra tool calls if needed
         for _ in range(2):
             if tool_used == "none":
                 break
@@ -194,7 +179,7 @@ class ClarasAGI:
             f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False, indent=2)}[/WORKSPACE]\n"
             f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
             f"Người dùng: {text}\n"
-            f"Hãy trả lời tiếng Việt ngắn gọn, tự nhiên, 2-5 câu."
+            "Hãy trả lời tiếng Việt ngắn gọn, tự nhiên, 2-5 câu."
         )
         answer = self.brain.think(T_ANSWER, ans_prompt, temperature=0.5)
         answer = self._clean(answer)
@@ -214,7 +199,7 @@ class ClarasAGI:
                 f"[CRITIQUE]{reflection}[/CRITIQUE]\n"
                 f"[USER]{text}[/USER]\n"
                 f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
-                f"Viết lại câu trả lời tốt hơn (tiếng Việt, 2-4 câu)."
+                "Viết lại câu trả lời tốt hơn (tiếng Việt, 2-4 câu)."
             )
             answer2 = self.brain.think(T_REWRITE, rw_prompt, temperature=0.3)
             answer2 = self._clean(answer2)
@@ -230,14 +215,11 @@ class ClarasAGI:
         self._update_user_model(text, answer, emotion)
         self._progress_goals(text, answer)
 
-        # meta: đánh dấu thủ tục answer_question
         self.mem.use_procedure("answer_question", success=(score >= 6))
 
-        # tự tạo skill nếu phát hiện lỗi/mistake
         if self.auto_skill and score < 4 and text:
             self._maybe_create_skill(text, answer, reflection)
 
-        # dream: tự động tổng hợp sau N lượt
         dream_note = ""
         if self.dream_every and self.turn_count % self.dream_every == 0:
             dr = self.dream()
@@ -247,9 +229,41 @@ class ClarasAGI:
         status = self.brain.status()["backend"]
         sure = int((1 - uncertainty) * 100)
         foot = f"\n\n⏱️ {elapsed:.0f}ms · 🧠 {status} · chấc {sure}%"
-        if rewritten: foot += " · 💭 tự sửa sau phản tỉnh"
-        if dream_note: foot += dream_note
+        if rewritten:
+            foot += " · 💭 tự sửa sau phản tỉnh"
+        if dream_note:
+            foot += dream_note
         return answer + foot
+
+    # ------------------ COMMAND REGISTRY ------------------
+    def _register_command(self, name, fn):
+        self._command_registry[name] = fn
+
+    def _init_command_registry(self):
+        self._register_command("quit", lambda agi, text: None)
+        self._register_command("exit", lambda agi, text: None)
+        self._register_command("thoát", lambda agi, text: None)
+        self._register_command("bye", lambda agi, text: None)
+        self._register_command("bye bye", lambda agi, text: None)
+        self._register_command("help", lambda agi, text: agi._help_text())
+        self._register_command("trợ giúp", lambda agi, text: agi._help_text())
+        self._register_command("?", lambda agi, text: agi._help_text())
+        self._register_command("status", lambda agi, text: agi._status_text())
+        self._register_command("trạng thái", lambda agi, text: agi._status_text())
+        self._register_command("dream", lambda agi, text: json.dumps(agi.dream(), ensure_ascii=False, indent=2))
+        self._register_command("export", lambda agi, text: agi._export_knowledge())
+        self._register_command("commands", lambda agi, text: agi._commands_text())
+        self._register_command("goal", lambda agi, text: agi._add_goal_from_text(text))
+        self._register_command("forget", lambda agi, text: agi._forget_from_text(text))
+        self._register_command("compliance", lambda agi, text: agi._compliance_check(text))
+        self._register_command("check", lambda agi, text: agi._quick_check(text))
+
+    def _handle_special_commands(self, text):
+        low = text.lower().strip()
+        for key, fn in self._command_registry.items():
+            if low == key or low.startswith(key + " "):
+                return fn(self, text)
+        return None
 
     # ------------------ FEEDBACK ------------------
     def feedback(self, text):
@@ -259,7 +273,7 @@ class ClarasAGI:
             rating = 1
         elif any(w in low for w in ["tệ","sai","dốt","chán","bad","không đúng","kém","ghét","bực"]):
             rating = -1
-        correction = re.sub(r"^(tốt|tệ|sai|hay|good|bad|ok|đúng|cảm ơn|tuyệt|kém)[\s:,.\-]*",
+        correction = re.sub(r"^(tốt|tệ|sai|hay|good|bad|ok|đúng|cảm ơn|tuyệt|kém)[\s:,.\\-]*",
                             "", low, count=1).strip()
         if rating == 0 and not correction:
             return "Hãy nói rõ 'tốt' hoặc 'tệ vì <sửa lại>' để tôi học nhé."
@@ -279,11 +293,9 @@ class ClarasAGI:
 
     # ------------------ DREAM ------------------
     def dream(self):
-        """Tổng hợp ký ức gần đây thành bài học. Giống người ngủ mơ."""
         recent = self.mem.recall_episodes(limit=30, recent_only=True)
         if len(recent) < 3 and recent:
             recent = self.mem.recall_episodes(limit=30)
-        # enrich with knowledge + mistakes if available
         try:
             semantics = self.mem.recall_semantics("", limit=80)
             mistakes = [dict(r) for r in self.mem.conn.execute(
@@ -318,17 +330,18 @@ class ClarasAGI:
                                    importance=0.5, emotion=0.0)
         return data
 
-    # ------------------ SKILLS (auto-generated) ------------------
+    # ------------------ SKILLS ------------------
     def _maybe_create_skill(self, trigger, bad_answer, critique):
         prompt = f"[MISTAKE]Trigger: {trigger[:200]}\nBad answer: {bad_answer[:200]}\nCritique: {critique[:200]}[/MISTAKE]"
         raw = self.brain.think(T_SKILL, prompt, temperature=0.4)
         try:
             m = re.search(r"\{.*\}", raw, re.S)
             sk = json.loads(m.group(0)) if m else None
-            if not sk or "name" not in sk or "steps" not in sk: return
-            # tránh trùng tên
+            if not sk or "name" not in sk or "steps" not in sk:
+                return
             name = re.sub(r"\W+", "_", sk["name"].lower())[:40].strip("_")
-            if not name: name = f"skill_{int(time.time())%10000}"
+            if not name:
+                name = f"skill_{int(time.time())%10000}"
             existing = self.mem.list_procedures()
             if any(p["name"] == name for p in existing):
                 return
@@ -339,168 +352,111 @@ class ClarasAGI:
         except Exception:
             pass
 
-    # ------------------ HELPERS ------------------
-    def _handle_special_commands(self, text):
-        low = text.lower().strip()
-        if low in ("quit","exit","thoát","bye","bye bye"):
-            return None
-        if low in ("help","trợ giúp","?"):
-            return self._help_text()
-        if low in ("status", "trạng thái"):
-            st = None
-            if _HAS_SCHEDULER and hasattr(self, "_study"):
-                st = self._study.status()
-            out = [
-                "🧠 Brain     : " + self.brain.status()["backend"] + " — " + self.brain.status()["model"],
-                "💾 Memory    : " + f"{self.mem.stats()['episodes']} episodes · {self.mem.stats()['semantics']} facts · {self.mem.stats()['procedures']} procedures",
-                "🎯 Goals     : " + f"{self.mem.stats()['active_goals']} active / {self.mem.stats()['done_goals']} done",
-                "💭 Dreams    : " + str(self.mem.stats()["dreams"]),
-                "⏱️ Age       : " + f"{((time.time()-self.traits['born_at'])/3600):.1f}h · {self.turn_count} turns",
-            ]
-            if st:
-                out.append("📚 Study     : " + f"running={st['running']} | due={st['due_reviews']} | today={st['logs_today']}")
-            return "\n".join(out)
-        if low == "dream":
-            return json.dumps(self.dream(), ensure_ascii=False, indent=2)
-        if low.startswith("goal "):
-            self.mem.add_goal(text[5:].strip(), priority=0.7)
-            return "🎯 Đã thêm mục tiêu mới."
-        if low == "compliance":
-            try:
-                from compliance import compliance_report, load_owner_policy
-                topic = text[len("compliance"):].strip() or "dịch vụ AI giúp người và doanh nghiệp nhỏ tại Việt Nam"
-                report = compliance_report(topic, load_owner_policy())
-                return json.dumps(report, ensure_ascii=False, indent=2)
-            except Exception as e:
-                return f"❌ Lỗi compliance: {e}"
-        if low.startswith("check "):
-            try:
-                from compliance import compliance_report, load_owner_policy
-                topic = low[6:].strip()
-                if not topic:
-                    return "Dùng: check <chủ đề kiếm tiền hoặc nghiệp vụ>"
-                report = compliance_report(topic, load_owner_policy())
-                short = ["compliance: " + topic, f"legit_income=" + str(report["legit_income"]), f"owner_aligned=" + str(report["owner_aligned"]), f"income_score=" + str(report["income_score"]), f"jurisdiction=" + str(report.get("jurisdiction_priority","")), f"locked=" + str(report.get("locked",False))]
-                return "\n".join(short)
-            except Exception as e:
-                return f"❌ Lỗi check: {e}"
-        if low.startswith("forget "):
-            q = text[7:].strip()
-            sems = self.mem.recall_semantics(q, limit=3)
-            for s in sems:
-                self.mem.forget(s["id"])
-            return f"🗑️ Đã quên {len(sems)} mẩu kiến thức liên quan."
-        if low == "export":
-            import datetime
-            path = self.mem.__class__.__module__  # not used
-            from memory import DB_DIR
-            fn = DB_DIR / f"export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            self.mem.export_knowledge(str(fn))
-            return f"💾 Đã xuất toàn bộ kiến thức ra: {fn}"
-        if low == "commands":
-            base = (
-                "📝 Lệnh đặc biệt:\n"
-                "  help / ?          trợ giúp\n"
-                "  status            xem trạng thái nội bộ\n"
-                "  goal <nội dung>   thêm mục tiêu tự chủ\n"
-                "  forget <từ khóa>  quên kiến thức liên quan\n"
-                "  dream             ép tổng hợp (ngủ mơ)\n"
-                "  export            xuất toàn bộ kiến thức ra file JSON\n"
-                "  nhớ: X là Y       dạy kiến thức mới\n"
-                "  tốt / tệ vì ...   feedback để tôi học\n"
-                "  check <chủ đề>    kiểm tra compliance/income\n"
-                "  income_roadmap <status|add_focus|add_action|complete_action|set_execution_plan|clear>|<args>\n"
-                "  income_focus <set_path|add_target|log|block_path|status>|<args>\n"
-                "  income_opportunity_finder <query>   quét cơ hội thu nhập phù hợp\n"
-                "  income_portfolio <add_platform|add_project|add_proposal|add_bounty|status|export>|<args>\n"
-                "  quit              thoát\n"
-                "Công cụ tôi tự dùng khi cần: calc, now, read, write, list, run_python, search"
+    # ------------------ COMMANDS ------------------
+    def _status_text(self):
+        s = self.brain.status()
+        st = None
+        if _HAS_SCHEDULER and hasattr(self, "_study"):
+            st = self._study.status()
+        out = [
+            "🧠 Brain     : " + s["backend"] + " — " + s["model"],
+            "💾 Memory    : " + f"{self.mem.stats()['episodes']} episodes · {self.mem.stats()['semantics']} facts · {self.mem.stats()['procedures']} procedures",
+            "🎯 Goals     : " + f"{self.mem.stats()['active_goals']} active / {self.mem.stats()['done_goals']} done",
+            "💭 Dreams    : " + str(self.mem.stats()["dreams"]),
+            "⏱️ Age       : " + f"{((time.time()-self.traits['born_at'])/3600):.1f}h · {self.turn_count} turns",
+        ]
+        if st:
+            out.append("📚 Study     : " + f"running={st['running']} | due={st['due_reviews']} | today={st['logs_today']}")
+        return "\n".join(out)
+
+    def _export_knowledge(self):
+        import datetime
+        from memory import DB_DIR
+        fn = DB_DIR / f"export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        self.mem.export_knowledge(str(fn))
+        return f"💾 Đã xuất toàn bộ kiến thức ra: {fn}"
+
+    def _commands_text(self):
+        base = (
+            "📝 Lệnh đặc biệt:\n"
+            "  help / ?          trợ giúp\n"
+            "  status            xem trạng thái nội bộ\n"
+            "  goal <nội dung>   thêm mục tiêu tự chủ\n"
+            "  forget <từ khóa>  quên kiến thức liên quan\n"
+            "  dream             ép tổng hợp (ngủ mơ)\n"
+            "  export            xuất toàn bộ kiến thức ra file JSON\n"
+            "  nhớ: X là Y       dạy kiến thức mới\n"
+            "  tốt / tệ vì ...   feedback để tôi học\n"
+            "  check <chủ đề>    kiểm tra compliance/income\n"
+            "  income_roadmap <status|add_focus|add_action|complete_action|set_execution_plan|clear>|<args>\n"
+            "  income_focus <set_path|add_target|log|block_path|status>|<args>\n"
+            "  income_opportunity_finder <query>   quét cơ hội thu nhập phù hợp\n"
+            "  income_portfolio <add_platform|add_project|add_proposal|add_bounty|status|export>|<args>\n"
+            "  quit              thoát\n"
+            "Công cụ tôi tự dùng khi cần: calc, now, read, write, list, run_python, search"
+        )
+        if _HAS_SCHEDULER:
+            base += (
+                "\n\n📚 Học theo lịch:\n"
+                "  study plan                 xem kế hoạch\n"
+                "  study plan add <chủ đề>    thêm chủ đề học\n"
+                "  study status               tiến độ / streak\n"
+                "  study review today         ôn tập hôm nay\n"
+                "  study weekly               tổng kết cuối tuần"
             )
-            if _HAS_SCHEDULER:
-                base += (
-                    "\n\n📚 Học theo lịch:\n"
-                    "  study plan                 xem kế hoạch\n"
-                    "  study plan add <chủ đề>    thêm chủ đề học\n"
-                    "  study status               tiến độ / streak\n"
-                    "  study review today         ôn tập hôm nay\n"
-                    "  study weekly               tổng kết cuối tuần"
-                )
-            if _HAS_SELF_PATCHER:
-                base += (
-                    "\n\n🔧 Tự nâng cấp:\n"
-                    "  patch <file>|<instruction>   đề xuất + áp patch\n"
-                    "  patch test <file>           smoke-test file\n"
-                    "  patch rollback <file>       rollback bản backup\n"
-                    "  patch backups               xem backup hiện có"
-                )
-            return base
+        if _HAS_SELF_PATCHER:
+            base += (
+                "\n\n🔧 Tự nâng cấp:\n"
+                "  patch <file>|<instruction>   đề xuất + áp patch\n"
+                "  patch test <file>           smoke-test file\n"
+                "  patch rollback <file>       rollback bản backup\n"
+                "  patch backups               xem backup hiện có"
+            )
+        return base
 
-        # study scheduler commands
-        if _HAS_SCHEDULER and hasattr(self, "_study") and low.startswith("study "):
-            cmds = getattr(self, "_study_commands", {})
-            for key, fn in cmds.items():
-                if low == key or low.startswith(key + " "):
-                    return fn(self, text)
-            return "Lệnh học tập: study plan | study status | study review today | study weekly"
+    def _add_goal_from_text(self, text):
+        goal = text[5:].strip()
+        if not goal:
+            return "Dùng: goal <nội dung>"
+        self.mem.add_goal(goal, priority=0.7)
+        return "🎯 Đã thêm mục tiêu mới."
 
-        # self-patch commands
-        if _HAS_SELF_PATCHER and low.startswith("patch"):
-            rest = low[5:].strip()
-            if not rest or rest in ("help", "?"):
-                return (
-                    "Lệnh tự nâng cấp:\n"
-                    "  patch <file>|<instruction>   đề xuất và áp dụng patch\n"
-                    "  patch test <file>           smoke-test file hiện tại\n"
-                    "  patch rollback <file>       rollback bản backup gần nhất\n"
-                    "  patch backups               liệt kê backup đang có\n"
-                    "Lưu ý: chỉ patch các file trong skills_custom/ và tools.py/memory.py/web_tools.py/..."
-                )
-            if rest.startswith("test "):
-                filename = rest[5:].strip()
-                res = smoke_test(self, filename)
-                return json.dumps(res, ensure_ascii=False)
-            if rest.startswith("rollback "):
-                filename = rest[9:].strip()
-                return rollback(filename)
-            if rest == "backups":
-                items = list_backups()
-                return f"Backups: {', '.join(items) if items else '(không có)'}"
-            if "|" not in rest:
-                return "Dùng: patch <file>|<instruction>"
-            filename, instruction = rest.split("|", 1)
-            filename = filename.strip()
-            instruction = instruction.strip()
-            res = propose_patch(self, filename, instruction)
-            return json.dumps(res, ensure_ascii=False, indent=2)
+    def _forget_from_text(self, text):
+        q = text[7:].strip()
+        if not q:
+            return "Dùng: forget <từ khóa>"
+        sems = self.mem.recall_semantics(q, limit=3)
+        for s in sems:
+            self.mem.forget(s["id"])
+        return f"🗑️ Đã quên {len(sems)} mẩu kiến thức liên quan."
 
-        if any(low.startswith(w) for w in ("tốt","tệ","sai","hay","good","bad","ok","đúng","kém")) and len(low) < 200:
-            return self.feedback(text)
-        if low.startswith("income_roadmap "):
-            try:
-                from skills_custom.active.income_roadmap import run as run_income_roadmap
-                return run_income_roadmap(self, text[len("income_roadmap "):])
-            except Exception as e:
-                return f"❌ Lỗi income_roadmap: {e}"
-        if low.startswith("income_focus "):
-            try:
-                from skills_custom.active.income_focus import run as run_income_focus
-                return run_income_focus(self, text[len("income_focus "):])
-            except Exception as e:
-                return f"❌ Lỗi income_focus: {e}"
-        if low.startswith("income_opportunity_finder ") or low.startswith("opportunity "):
-            try:
-                from skills_custom.active.income_opportunity_finder import run as run_income_opp
-                arg = text[len("income_opportunity_finder "):] if low.startswith("income_opportunity_finder ") else text[len("opportunity "):]
-                return run_income_opp(self, arg)
-            except Exception as e:
-                return f"❌ Lỗi opportunity scan: {e}"
-        if low.startswith("income_portfolio "):
-            try:
-                from skills_custom.active.income_portfolio import run as run_income_portfolio
-                return run_income_portfolio(self, text[len("income_portfolio "):])
-            except Exception as e:
-                return f"❌ Lỗi income_portfolio: {e}"
-        return None
+    def _compliance_check(self, text):
+        try:
+            from compliance import compliance_report, load_owner_policy
+            topic = text[len("compliance"):].strip() or "dịch vụ AI giúp người và doanh nghiệp nhỏ tại Việt Nam"
+            report = compliance_report(topic, load_owner_policy())
+            return json.dumps(report, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"❌ Lỗi compliance: {e}"
+
+    def _quick_check(self, text):
+        try:
+            from compliance import compliance_report, load_owner_policy
+            topic = text[6:].strip()
+            if not topic:
+                return "Dùng: check <chủ đề kiếm tiền hoặc nghiệp vụ>"
+            report = compliance_report(topic, load_owner_policy())
+            short = [
+                "compliance: " + topic,
+                "legit_income=" + str(report["legit_income"]),
+                "owner_aligned=" + str(report["owner_aligned"]),
+                "income_score=" + str(report["income_score"]),
+                "jurisdiction=" + str(report.get("jurisdiction_priority", "")),
+                "locked=" + str(report.get("locked", False)),
+            ]
+            return "\n".join(short)
+        except Exception as e:
+            return f"❌ Lỗi check: {e}"
 
     def _help_text(self):
         s = self.status()
@@ -516,6 +472,7 @@ class ClarasAGI:
             "\nGõ 'commands' để xem toàn bộ lệnh."
         )
 
+    # ------------------ HELPERS ------------------
     def _detect_emotion(self, text):
         low = text.lower()
         pos = sum(w in low for w in ["cảm ơn","tốt","hay","yêu","vui","thích","tuyệt","ok","😊","👍","❤️","😂"])
@@ -527,18 +484,24 @@ class ClarasAGI:
             cov = len(sem) + len(epi)
             c = max(0.15, 1 - 0.55 * min(cov, 6) / 6)
             return c
-        if len(q) < 5: return 0.3
+        if len(q) < 5:
+            return 0.3
         return 0.85
 
     def _theory_of_mind(self, text):
         low = text.lower()
         intent = "unknown"
         need = "information"
-        if any(k in low for k in ["làm ơn","giúp","help"]): intent = "request_help"
-        elif any(k in low for k in ["?","hỏi","tại sao","làm sao","gì","ai","ở đâu"]): intent = "question"
-        elif any(k in low for k in ["nhớ","học","ghi nhớ","note"]): intent = "teach"
-        elif any(k in low for k in ["chào","hello","hi"]): intent = "greet"
-        elif any(k in low for k in ["tốt","tệ","sai","hay"]): intent = "feedback"
+        if any(k in low for k in ["làm ơn","giúp","help"]):
+            intent = "request_help"
+        elif any(k in low for k in ["?","hỏi","tại sao","làm sao","gì","ai","ở đâu"]):
+            intent = "question"
+        elif any(k in low for k in ["nhớ","học","ghi nhớ","note"]):
+            intent = "teach"
+        elif any(k in low for k in ["chào","hello","hi"]):
+            intent = "greet"
+        elif any(k in low for k in ["tốt","tệ","sai","hay"]):
+            intent = "feedback"
         return {"intent": intent, "need": need}
 
     def _parse_plan(self, raw):
@@ -580,7 +543,6 @@ class ClarasAGI:
     def _forced_tool(self, text):
         low = text.lower()
         text = text.strip()
-        # write: path|content or path content
         if low.startswith("write "):
             arg = text[6:].strip()
             if "|" in arg.splitlines()[0]:
@@ -589,19 +551,17 @@ class ClarasAGI:
             if len(parts) == 2:
                 return f"write {parts[0].strip()}|{parts[1].strip()}"
             return f"write {arg}"
-        # direct tool syntax: toolname args
         m = re.match(r"^(calc|read|write|list|run_python|search|now|help|python)\s+(.*)", text, re.I | re.S)
         if m:
             return f"{m.group(1).lower()} {m.group(2).strip()}"
-        # calc
         if re.search(r"^\s*tính\s+", low):
             expr = re.sub(r"^\s*tính\s+", "", text).strip("?.").strip()
             if re.match(r"^[\d\s\.\+\-\*\/\(\)\^%]+$", expr):
                 return f"calc {expr}"
         if re.search(r"\d\s*[\+\-\*\/\^]\s*\d", text) and not re.search(r"[a-zA-Zà-ỹÀ-Ỵ]", text.split("?")[0]):
             m = re.search(r"[\d\s\.\+\-\*\/\(\)\^%]+", text)
-            if m: return f"calc {m.group(0).strip()}"
-        # now
+            if m:
+                return f"calc {m.group(0).strip()}"
         if re.search(r"(mấy giờ|giờ gì|ngày mấy|hôm nay)\b", low):
             return "now"
         return None
@@ -609,91 +569,73 @@ class ClarasAGI:
     def _extract_score(self, ref):
         m = re.search(r"(\d{1,2})\s*[/:]\s*10", ref)
         if m:
-            try: return int(m.group(1))
-            except: pass
+            try:
+                return int(m.group(1))
+            except Exception:
+                pass
         negs = ["chưa tốt","sai","thiếu","tệ","kém","yếu","lủng củng","vòng vo","quá ngắn"]
         pos = ["tốt","đầy đủ","chính xác","hợp lý","rõ ràng"]
         s = 5
         for w in negs:
-            if w in ref.lower(): s -= 1
+            if w in ref.lower():
+                s -= 1
         for w in pos:
-            if w in ref.lower(): s += 1
+            if w in ref.lower():
+                s += 1
         return max(1, min(10, s))
 
     def _clean(self, ans):
-        ans = re.sub(r"\[SYSTEM[^\]]*\].*?(?=\n|$)", "", ans, flags=re.S)
-        ans = re.sub(r"(As an AI|Như một (trí tuệ nhân tạo|AI))[^\n]*\.?", "", ans, flags=re.I)
-        ans = ans.strip().strip('"').strip("`").strip()
-        # loại tag nội bộ
-        ans = re.sub(r"\[\/?[A-Z_]+\]", "", ans)
-        return ans or "(Tôi chưa có câu trả lời phù hợp.)"
+        text = str(ans or "")
+        text = re.sub(r"^```(?:json|python)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text, flags=re.M)
+        return text.strip()
 
     def _compact_wm(self):
         out = []
-        for it in self.wm:
-            c = it.get("content")
-            if isinstance(c, list): c = c[:6]
-            elif isinstance(c, dict):
-                c = {k: (v[:200] if isinstance(v, str) else v) for k, v in list(c.items())[:6]}
-            elif isinstance(c, str): c = c[:300]
-            out.append({"role": it.get("role"), "content": c})
+        for item in self.wm[-8:]:
+            role = item.get("role")
+            content = item.get("content")
+            if isinstance(content, (dict, list)):
+                content = json.dumps(content, ensure_ascii=False)
+            out.append({"role": role, "content": content})
         return out
 
-    def _auto_learn(self, user_text, answer):
-        # người dùng dạy tường minh
-        m = re.match(r"^(nhớ|ghi nhớ|note|học)\s*[:\-]?\s*(.+)$", user_text, re.I)
-        if m:
-            fact = m.group(2).strip().rstrip(".")
-            topic = fact.split(" là ", 1)[0].strip() if " là " in fact else "fact"
-            self.mem.learn(topic, fact, confidence=0.9, source="user_taught")
-            return
-        # pattern "X là Y"
-        m = re.match(r"^([A-Za-zÀ-ỹ0-9 _\-\"]{2,50})\s+là\s+(.+?)\.?$", user_text.strip())
-        if m:
-            topic = m.group(1).strip()
-            fact = user_text.strip().rstrip(".")
-            if topic.lower() not in ("tôi","bạn","gì","ai","đó","nào","hôm nay","ngày mai",
-                                      "việc đó","điều đó","cái đó"):
-                self.mem.learn(topic, fact, confidence=0.65, source="inferred")
-        # sở thích
-        m = re.match(r"^(tôi)\s+(thích|ghét|yêu|không thích)\s+(.+?)\.?$", user_text.strip(), re.I)
-        if m:
-            verb = m.group(2).lower()
-            obj = m.group(3).strip()
-            self.mem.learn("preference", f"Người dùng {verb} {obj}", confidence=0.8, source="user_taught")
-            self.mem.set_user(f"preference_{obj[:20]}", {"verb": verb, "object": obj}, confidence=0.8)
+    def _auto_learn(self, text, answer):
+        if text.lower().startswith(("nhớ", "ghi nhớ", "học", "note")):
+            m = re.match(r"^(nhớ|ghi nhớ|học|note)\s*[:\-]?\s*(.+)$", text, re.I)
+            if m:
+                fact = m.group(2).strip()
+                self.mem.learn("user_taught", fact, confidence=0.8, source="user_taught")
+                self.mem.remember_episode("learning", fact, importance=0.8, emotion=0.2)
+        if re.match(r"^[A-Za-zÀ-ỹ0-9 _\-]{2,50}\s+(là|ở|thích|ghét|làm)\s+.+", text):
+            self.mem.learn("user_statement", text, confidence=0.7, source="user_taught")
+            self.mem.remember_episode("learning", text, importance=0.6, emotion=0.1)
 
     def _update_user_model(self, text, answer, emotion):
-        # tên
         m = re.search(r"(?:tôi )?(?:tên là|tên)\s+([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ\s]{1,20}?)(?:\.|,|$|\s+và|\s+ở|\s+từ|\s+tuổi|\s+làm)", text)
         if m:
             name = m.group(1).strip().split()[0]
             if len(name) > 1 and name.lower() not in ("gì","ai","là","bạn","clara"):
                 self.mem.set_user("name", name, confidence=0.9)
                 self.mem.learn("user_name", f"Người dùng tên là {name}", confidence=0.9, source="user_taught")
-        # tuổi
         m = re.search(r"tôi\s+(?:được\s+)?(\d{1,2})\s*tuổi", text)
         if m:
             self.mem.set_user("age", int(m.group(1)), confidence=0.8)
-        # địa điểm
         m = re.search(r"(?:tôi )?(?:sống ở|ở|đến từ|quê ở|quê tôi ở)\s+([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ\s]{1,30}?)(?:\.|,|$|\s+và|\s+hiện|\s+tôi)", text)
         if m:
             loc = m.group(1).strip()
             self.mem.set_user("location", loc, confidence=0.75)
             self.mem.learn("user_location", f"Người dùng ở {loc}", confidence=0.75, source="user_taught")
-        # nghề
         m = re.search(r"tôi\s+(?:là|làm)\s+(?:một\s+)?([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ\s]{1,25}?)(?:\.|,|$|\s+và|\s+tôi|\s+ở)", text)
         if m:
             job = m.group(1).strip()
             if job.lower() not in ("ai","gì","đây","đó","clara"):
                 self.mem.set_user("job", job, confidence=0.7)
-        # điều chỉnh traits dựa trên emotion
         if emotion < -0.3:
             self.traits["empathy"] = min(1.0, self.traits["empathy"] + 0.02)
             self.mem.set_trait("empathy", self.traits["empathy"])
 
     def _progress_goals(self, text, answer):
-        # heuristic: có thêm kiến thức về user
         goals = self.mem.get_active_goals(8)
         for g in goals:
             gl = g["goal"].lower()
@@ -702,7 +644,6 @@ class ClarasAGI:
                 if len(self.mem.all_user()) >= 3:
                     done = True
             elif "cải thiện chất lượng" in gl:
-                # không hoàn thành vĩnh viễn, nhưng đánh dấu tiến bộ
                 pass
             elif "học ít nhất 1 điều mới" in gl:
                 sem_new = self.mem.recall_semantics(text, limit=1)
@@ -717,7 +658,8 @@ class ClarasAGI:
                 "thời tiết","thời gian","tên","tuổi","địa điểm","ý kiến","kế hoạch","giúp"]
         low = text.lower()
         for k in keys:
-            if k in low: tags.append(k)
+            if k in low:
+                tags.append(k)
         return tags
 
     def status(self):

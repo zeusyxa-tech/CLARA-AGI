@@ -1,5 +1,5 @@
 """
-CLARA-AGI v1.1 - Brain abstraction.
+CLARA-AGI v1.3 - Brain abstraction.
 Hỗ trợ: Ollama local (tự nhận), fallback là MicroLLM (template, chạy được mọi máy).
 """
 import json, urllib.request, re, time, os, hashlib, unicodedata

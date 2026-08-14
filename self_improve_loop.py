@@ -1,5 +1,5 @@
 """
-CLARA-AGI v1.2 / Self-Improvement Agent Loop
+CLARA-AGI v1.3 / Self-Improvement Agent Loop
 Chạy song song với curriculum + autolearn, quyết định cải thiện theo dữ liệu thật.
 """
 import time, random, json, threading, re
@@ -149,9 +149,10 @@ class SelfImprovementLoop:
             "Trả về JSON duy nhất: {\"ok\": bool, \"score\": float 0-1, \"issue\": str}."
         )
         raw = self.agi.brain.think(
-            self.agi.brain.T_REFLECT if hasattr(self.agi.brain, "T_REFLECT") else "__ANSWER__",
+            self.agi.brain.T_REFLECT if hasattr(self.agi.brain, "T_REFLECT") else "__REFLECT__",
             prompt,
             temperature=0.2,
+            num_predict=180,
         )
         try:
             m = re.search(r"\{.*\}", raw, re.S)

@@ -1,5 +1,5 @@
 """
-CLARA-AGI v1.1 - Auto-Learn / Idle Self-Improvement Loop.
+CLARA-AGI v1.3 - Auto-Learn / Idle Self-Improvement Loop.
 Chạy nền khi không có người dùng nói chuyện: tự củng cố kiến thức, phản tỉnh,
 tự đặt câu hỏi, phát hiện lỗ hổng kiến thức, tạo mục tiêu mới.
 """
