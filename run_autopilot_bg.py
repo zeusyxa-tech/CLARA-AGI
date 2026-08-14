@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLARA-AGI v1.2 headless autopilot: dedup + ethics + curriculum."""
+"""CLARA-AGI v1.3 headless autopilot: dedup + ethics + curriculum + bounded loops."""
 import os, sys, time, threading
 from pathlib import Path
 
@@ -51,15 +51,13 @@ def _run():
     from curriculum import (
         daily_plan,
         load_policy,
-        load_owner_policy,
-        is_aligned_with_owner,
         LEVELS,
         is_ethical,
         _score_topic,
     )
+    from compliance import load_owner_policy, is_aligned_with_owner, compliance_report, is_legit_income
     from self_improve import research
     from self_improve_loop import SelfImprovementLoop
-    from compliance import compliance_report, is_aligned_with_owner as _compliance_aligned, is_legit_income
 
     policy = load_policy()
     owner_policy = load_owner_policy()
