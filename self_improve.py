@@ -90,9 +90,9 @@ def research(agi, topic: str, max_pages: int = MAX_PAGES_DEFAULT) -> str:
 
     deduped = [(text, url) for text, url in _dedup(agi, [t for t, _ in deduped])]
 
-    for fact, url in deduped:
-        if len(fact) > 15 and url:
-            agi.mem.learn(f"web:{_normalize(topic)[:25]}", fact, confidence=MIN_CONFIDENCE, source=f"web:{url}")
+    for fact_text, url in deduped:
+        if len(fact_text) > 15 and url:
+            agi.mem.learn(f"web:{_normalize(topic)[:25]}", fact_text, confidence=MIN_CONFIDENCE, source=f"web:{url}")
             learned += 1
 
     agi.mem.remember_episode("research",
