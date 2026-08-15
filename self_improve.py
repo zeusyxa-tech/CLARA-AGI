@@ -88,7 +88,9 @@ def research(agi, topic: str, max_pages: int = MAX_PAGES_DEFAULT) -> str:
         seen.add(key)
         deduped.append((text, url))
 
-    deduped = [(text, url) for text, url in _dedup(agi, [t for t, _ in deduped])]
+    text_to_url = {text: url for text, url in deduped}
+    deduped_texts = _dedup(agi, list(text_to_url.keys()))
+    deduped = [(text, text_to_url.get(text, "")) for text in deduped_texts]
 
     for fact_text, url in deduped:
         if len(fact_text) > 15 and url:
