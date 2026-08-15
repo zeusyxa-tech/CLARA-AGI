@@ -126,32 +126,33 @@ class AutoLearner:
         self._log(f"phản tỉnh ký ức cũ (điểm {score}/10)")
 
     def _act_self_qa(self):
-        """Tự đặt câu hỏi về chính kiến thức mình có, rồi tự trả lời."""
+        """Tự đặt câu hỏi về kiến thức đang có, rồi tự trả lời."""
         sem = self.agi.mem.recall_semantics("", limit=30)
-        if len(sem) < 2: return
+        if len(sem) < 2:
+            return
         facts = "\n".join(f"- {s['fact']}" for s in random.sample(sem, min(5, len(sem))))
-        q_prompt = (f"Dựa trên các kiến thức sau, hãy đặt MỘT câu hỏi suy luận thú vị bằng tiếng Việt "
-                    f"(không trả lời, chỉ đặt câu hỏi):\n{facts}")
+        q_prompt = (
+            f"Dựa trên các kiến thức sau, hãy đặt MỘT câu hỏi suy luận thú vị bằng tiếng Việt "
+            f"(không trả lời, chỉ đặt câu hỏi):\n{facts}"
+        )
         question = self.agi.brain.think(T_ANSWER, "[WORKSPACE][][/WORKSPACE][TOOL_RESULT]không dùng[/TOOL_RESULT]\n" + q_prompt, temperature=0.7)
         question = self.agi._clean(question)
         question = re.sub(r"^(câu hỏi:|hỏi:)", "", question, flags=re.I).strip()
-        if not question or len(question) < 8: return
+        if not question or len(question) < 8:
+            return
         if not self._is_compliant(question):
             self._log("bỏ qua self-qa không phù hợp chính sách")
             return
-        # tự trả lời (giả lập user input)
         ans = self.agi.chat(question)
         ans_clean = ans.split("\n⏱️")[0]
-        # tự chấm
-        ref_prompt = f"[USER]{question}[/USER]\n[ANSWER]{ans_clean[:400]}[/ANSWER]"
-        ref = self.agi.brain.think(T_REFLECT, ref_prompt, temperature=0.2)
+        ref = self.agi.brain.think(T_REFLECT, f"[USER]{question}[/USER]\n[ANSWER]{ans_clean[:400]}[/ANSWER]", temperature=0.2)
         score = self.agi._extract_score(ref)
         if score < 5:
             self.agi.mem.remember_episode("self_qa_mistake",
                 f"Tự hỏi: {question}\nTự trả lời: {ans_clean[:200]}\nPhê bình: {ref[:200]}",
                 importance=0.6, emotion=-0.2)
         else:
-            self.agi.mem.learn("inferred", ans_clean[:200], confidence=0.4, source="self_qa")
+            self.agi.mem.learn("inferred", ans_clean[:200], confidence=0.45, source="self_qa")
         self.stats["self_qa"] += 1
         self._log(f"tự hỏi: {question[:60]}... → {score}/10")
 

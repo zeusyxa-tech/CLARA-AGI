@@ -77,6 +77,13 @@ def add_topic(agi, topic: str, detail: str = "", priority: float = 0.5,
               target_days: int = 7, assign_now: bool = True) -> str:
     c = _conn()
     ts = time.time()
+    existing = c.execute(
+        "SELECT * FROM study_plan WHERE topic=? AND status IN ('active','queued')",
+        (topic.strip(),)
+    ).fetchone()
+    if existing:
+        c.close()
+        return f"⚠️ Chủ đề '{topic}' đã có trong kế hoạch."
     assign_date = _day_stamp(ts) if assign_now else None
     target_date = _day_stamp(ts + target_days * 86400)
     c.execute(
@@ -470,9 +477,13 @@ def cmd_study_weekly(agi, text: str) -> str:
 
 
 def attach_study_commands(agi):
-    agi._study_commands = {
+    entries = {
         "study plan": cmd_study_plan,
         "study status": cmd_study_status,
         "study review today": cmd_study_review_today,
         "study weekly": cmd_study_weekly,
     }
+    if hasattr(agi, "_register_command"):
+        for key, fn in entries.items():
+            agi._register_command(key, fn)
+    agi._study_commands = entries

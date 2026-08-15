@@ -9,3 +9,4 @@ data/export_*.json
 skills_custom/_pending/*.py
 workspace/*
 !workspace/.gitkeep
+autopilot.pid

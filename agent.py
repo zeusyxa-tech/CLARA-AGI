@@ -38,6 +38,8 @@ class ClarasAGI:
         }
         self.first_run = self.mem.stats()["episodes"] == 0
         self._study = None
+        self._command_registry = {}
+        self._init_command_registry()
         if _HAS_SCHEDULER:
             attach_study_commands(self)
             self._study = StudyScheduler(self, enabled=True, interval=120)
@@ -45,8 +47,6 @@ class ClarasAGI:
                 self._study.start()
             except Exception:
                 pass
-        self._command_registry = {}
-        self._init_command_registry()
 
     # ------------------ CORE CYCLE ------------------
     def chat(self, user_text: str) -> str:
@@ -257,6 +257,11 @@ class ClarasAGI:
         self._register_command("forget", lambda agi, text: agi._forget_from_text(text))
         self._register_command("compliance", lambda agi, text: agi._compliance_check(text))
         self._register_command("check", lambda agi, text: agi._quick_check(text))
+        self._register_command("income_roadmap", lambda agi, text: agi._income_roadmap(text[len("income_roadmap"):].strip()))
+        self._register_command("income_focus", lambda agi, text: agi._income_focus(text[len("income_focus"):].strip()))
+        self._register_command("income_opportunity_finder", lambda agi, text: agi._income_opportunity_finder(text[len("income_opportunity_finder"):].strip()))
+        self._register_command("opportunity", lambda agi, text: agi._income_opportunity_finder(text[len("opportunity"):].strip()))
+        self._register_command("income_portfolio", lambda agi, text: agi._income_portfolio(text[len("income_portfolio"):].strip()))
 
     def _handle_special_commands(self, text):
         low = text.lower().strip()
@@ -457,6 +462,34 @@ class ClarasAGI:
             return "\n".join(short)
         except Exception as e:
             return f"❌ Lỗi check: {e}"
+
+    def _income_roadmap(self, text):
+        try:
+            from skills_custom.active.income_roadmap import run as run_income_roadmap
+            return run_income_roadmap(self, text)
+        except Exception as e:
+            return f"❌ Lỗi income_roadmap: {e}"
+
+    def _income_focus(self, text):
+        try:
+            from skills_custom.active.income_focus import run as run_income_focus
+            return run_income_focus(self, text)
+        except Exception as e:
+            return f"❌ Lỗi income_focus: {e}"
+
+    def _income_opportunity_finder(self, text):
+        try:
+            from skills_custom.active.income_opportunity_finder import run as run_income_opp
+            return run_income_opp(self, text)
+        except Exception as e:
+            return f"❌ Lỗi opportunity scan: {e}"
+
+    def _income_portfolio(self, text):
+        try:
+            from skills_custom.active.income_portfolio import run as run_income_portfolio
+            return run_income_portfolio(self, text)
+        except Exception as e:
+            return f"❌ Lỗi income_portfolio: {e}"
 
     def _help_text(self):
         s = self.status()

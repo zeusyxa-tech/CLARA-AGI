@@ -3,7 +3,7 @@
 CLARA-AGI v1.1 — CLI launcher.
 Chạy: python3 main.py [--micro] [--model <name>] [--web] [--voice] [--auto-learn]
 """
-import argparse, sys, os, json, time, random, threading
+import argparse, sys, os, json, time, random, threading, re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
