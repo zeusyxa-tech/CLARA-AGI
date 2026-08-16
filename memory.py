@@ -351,7 +351,18 @@ class Memory:
         return json.loads(r["v"]) if r else default
 
     # ---------------- USER MODEL ----------------
-    def set_user(self, k, v, confidence=0.8):
+    def set_user(self, k, v, confidence=0.8, merge=False):
+        if merge:
+            existing = self.get_user(k)
+            if existing:
+                old = existing[0]
+                if isinstance(old, list) and isinstance(v, list):
+                    v = list(dict.fromkeys(old + v))
+                elif isinstance(old, dict) and isinstance(v, dict):
+                    old.update(v)
+                    v = old
+                elif isinstance(old, str) and isinstance(v, str):
+                    v = old + ", " + v
         self.conn.execute(
             "INSERT OR REPLACE INTO user_model(k,v,confidence) VALUES(?,?,?)", (k, json.dumps(v), confidence))
         self.conn.commit()

@@ -128,12 +128,39 @@ class MicroLLM:
         sem = self._sem_hits(wm)
         tr = self._tool_result(prompt)
 
+        # câu hỏi về chính người dùng
+        user_q_re = re.compile(
+            r"tên tôi|tôi tên|tôi tên gì|tôi bao nhiêu tuổi|tuổi tôi|"
+            r"tôi thích gì|tôi ghét gì|tôi làm nghề gì|tôi ở đâu|"
+            r"bạn còn nhớ tôi|bạn biết gì về tôi|tôi là ai|tôi là gì|"
+            r"tôi sinh năm|tôi năm sinh|tôi bao nhiêu|tên của tôi",
+            re.I,
+        )
+        if user_q_re.search(low):
+            um = {}
+            for it in wm:
+                if it.get("role") == "user_model":
+                    raw = it.get("content") or {}
+                    if isinstance(raw, str):
+                        try:
+                            raw = json.loads(raw)
+                        except Exception:
+                            raw = {}
+                    um = raw
+                    break
+            if um:
+                parts = []
+                for k, v in um.items():
+                    parts.append(f"{k}: {v}")
+                return "Bạn có các thông tin: " + ", ".join(parts) + "."
+            return "Tôi chưa biết rõ về bạn lắm. Bạn có thể cho tôi biết thêm không?"
+
         # chào
         if re.match(r"^(chào|hello|hi|xin chào|hey)\b", low):
-            return "Chào bạn! Tôi là CLARA-AGI v1.1. Rất vui được trò chuyện với bạn."
-        # hỏi danh tính
+            return "Chào bạn! Tôi là CLARA-AGI v1.4. Rất vui được trò chuyện với bạn."
+        # hỏi danh tính CLARA
         if "bạn" in low and ("ai" in low or "là gì" in low or "tên gì" in low or "giới thiệu" in low):
-            return ("Tôi là CLARA-AGI v1.1 — một tác nhân tự chủ có kiến trúc gần AGI "
+            return ("Tôi là CLARA-AGI v1.4 — một tác nhân tự chủ có kiến trúc gần AGI "
                     "(bộ nhớ 3 lớp, không gian làm việc toàn cục, tự phản tỉnh, dùng công cụ, tự tạo skill). "
                     "Tôi chạy hoàn toàn local trên máy bạn.")
         if re.search(r"(mấy giờ|giờ gì|ngày mấy|hôm nay)", low):
@@ -174,7 +201,7 @@ class MicroLLM:
                     "hoặc cài Ollama + qwen2.5:1.5b để tôi có khả năng suy luận thật.")
 
         # nhận thông tin / mệnh đề
-        if re.match(r"^[A-Za-zÀ-ỹ0-9 _\-\"]{2,50}\s+(là|ở|thích|ghét|làm)\s+.+", user_msg):
+        if re.search(r"tôi\s+(?:thích|ghét|hay\s+(?:uống|ăn|chơi|đọc|xem|nghe)|yêu|thường|đam\s+mê)\s+.+", user_msg, re.I):
             return f"Đã ghi nhận: '{user_msg}'. Lưu vào semantic memory."
 
         return f"Đã nghe: '{user_msg[:80]}'. Tôi lưu vào episodic memory."
