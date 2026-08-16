@@ -14,6 +14,11 @@ from pathlib import Path
 SAFE_ROOT = (Path(__file__).parent / "workspace").resolve()
 SAFE_ROOT.mkdir(exist_ok=True)
 
+try:
+    from vision import tool_vision
+except Exception:
+    tool_vision = None
+
 
 def _safe_path(path: str) -> Path:
     if not path:
@@ -239,6 +244,7 @@ def tool_help(*_) -> str:
         "  • write <path>|<nội dung>   ghi file (dùng | để phân cách path)\n"
         "  • run_python <code>   chạy code Python trong sandbox an toàn\n"
         "  • search <từ khóa>    tìm trong bộ nhớ\n"
+        "  • vision <path>       phân tích ảnh (dùng | để thêm câu hỏi)\n"
         "  • help                danh sách này\n"
         "\nWorkspace: " + str(SAFE_ROOT)
     )
@@ -254,6 +260,7 @@ TOOLS = {
     "run_python":  {"fn": tool_run_python,  "needs_agent": False, "desc": "Chạy Python sandbox"},
     "search":      {"fn": tool_search_memory,"needs_agent": True, "desc": "Tìm trong bộ nhớ"},
     "list_skills": {"fn": tool_list_skills,  "needs_agent": True, "desc": "Liệt kê skills custom"},
+    "vision":       {"fn": tool_vision,       "needs_agent": True, "desc": "Phân tích ảnh"},
     "help":        {"fn": tool_help,        "needs_agent": False, "desc": "Trợ giúp"},
 }
 

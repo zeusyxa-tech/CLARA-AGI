@@ -19,6 +19,7 @@ Mọi "AI tự học" bạn từng thấy chỉ là **chatbot + vector database*
 ✅ **"Ngủ mơ"** (dream) — khi rảnh tự tổng hợp ký ức thành bài học (như người ngủ củng cố trí nhớ)  
 ✅ **Lý thuyết về cái tâm** (Theory of Mind) — mô hình hóa người dùng (tên, tuổi, nghề, sở thích…)  
 ✅ **Công cụ** (tay chân) — tính toán, đọc/ghi file, **chạy code Python sandbox an toàn**, tìm kiếm bộ nhớ  
+✅ **Nhìn ảnh/màn hình** (vision) — phân tích nội dung ảnh qua API hoặc Pillow local  
 ✅ **Cảm xúc nhẹ** — phát hiện giọng điệu bạn để điều chỉnh độ quan trọng của ký ức  
 ✅ **Mục tiêu tự chủ** — khởi động với 5 mục tiêu nội tại và tự hoàn thành chúng  
 ✅ **Giao diện CLI / Web / Giọng nói** — bạn chọn kiểu nào cũng được
