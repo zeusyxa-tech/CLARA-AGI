@@ -66,12 +66,13 @@ class AutoLearner:
     def _one_idle_step(self):
         self.steps_done += 1
         activities = [
-            ("consolidate", 0.25),
-            ("reflect_old", 0.20),
-            ("self_qa",    0.20),
-            ("dream",      0.15),
+            ("consolidate", 0.20),
+            ("reflect_old", 0.15),
+            ("self_qa",    0.15),
+            ("dream",      0.10),
             ("goal_check", 0.10),
             ("curiosity",  0.10),
+            ("lesson_delivery", 0.20),
         ]
         name = self._weighted_choice(activities)
         with self._lock:
@@ -215,3 +216,60 @@ class AutoLearner:
             self._log(f"chuẩn bị hỏi bạn: {q[:60]}")
         else:
             self._log("tư duy vẩn vơ...")
+
+    def _act_lesson_delivery(self):
+        """Pick a high-value Hermes lesson, restate it in micro-friendly form, and record delivery."""
+        try:
+            rows = self.agi.mem.conn.execute(
+                "SELECT topic, fact, confidence FROM semantics "
+                "WHERE source='hermes' AND confidence >= 0.6 "
+                "ORDER BY RANDOM() LIMIT 1"
+            ).fetchall()
+        except Exception:
+            rows = []
+        if not rows:
+            return
+        row = rows[0]
+        topic, fact, confidence = row["topic"], row["fact"], row["confidence"]
+        try:
+            prompt = (
+                "Tôi đang học bài này từ Hermes: "
+                f"'{topic}'. Nội dung chính: {fact}. "
+                "Hãy đặt 1 câu hỏi kiểm tra ngắn gọn bằng tiếng Việt "
+                "để tôi kiểm tra xem đã nắm được ý chính chưa. "
+                "Chỉ trả về câu hỏi, không giải thích."
+            )
+            question = self.agi.brain.think(
+                T_ANSWER,
+                "[WORKSPACE][][/WORKSPACE][TOOL_RESULT]không dùng[/TOOL_RESULT]\n" + prompt,
+                temperature=0.7,
+            )
+            question = self.agi._clean(question)
+            if not question or len(question) < 8:
+                return
+            answer = self.agi.chat(question)
+            answer_clean = answer.split("\n⏱️")[0]
+            ref = self.agi.brain.think(
+                T_REFLECT,
+                f"[USER]{question}[/USER]\n[ANSWER]{answer_clean[:400]}[/ANSWER]",
+                temperature=0.2,
+            )
+            score = self.agi._extract_score(ref)
+            if score < 6:
+                self.agi.mem.remember_episode(
+                    "hermes_lesson_mistake",
+                    f"Bài: {topic}\nCâu hỏi: {question}\nTrả lời: {answer_clean[:200]}\nPhê bình: {ref[:200]}",
+                    importance=0.6,
+                    emotion=-0.2,
+                )
+            else:
+                self.agi.mem.remember_episode(
+                    "hermes_lesson_pass",
+                    f"Bài: {topic}\nCâu hỏi: {question}\nĐiểm: {score}/10",
+                    importance=0.55,
+                    emotion=0.2,
+                )
+            self.stats["self_qa"] += 1
+            self._log(f"dạy bài Hermes: {topic[:50]}... → {score}/10")
+        except Exception as e:
+            self._log(f"lỗi dạy bài Hermes: {e}")
