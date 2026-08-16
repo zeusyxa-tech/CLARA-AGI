@@ -1,4 +1,4 @@
-# 🧬 CLARA-AGI v1.0
+# 🧬 CLARA-AGI v1.4
 ## **AI tự học, tự nâng cấp — kiến trúc gần AGI — chạy LOCAL trên máy yếu**
 
 > Continuous Learning Autonomous Reasoning Agent

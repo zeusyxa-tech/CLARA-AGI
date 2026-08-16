@@ -1,5 +1,5 @@
 """
-CLARA-AGI v1.3 - Global Workspace Agent (9-step cognitive cycle).
+CLARA-AGI v1.4 - Global Workspace Agent (9-step cognitive cycle).
 """
 import re, json, time, math, random
 from pathlib import Path
@@ -229,6 +229,9 @@ class ClarasAGI:
         if self.dream_every and self.turn_count % self.dream_every == 0:
             dr = self.dream()
             dream_note = f"\n💤 Tôi vừa 'ngủ mơ' và rút ra {len(dr.get('lessons', []))} bài học."
+        self.history.append({"user": text[:200], "assistant": answer[:200]})
+        if len(self.history) > 8:
+            self.history = self.history[-8:]
 
         elapsed = (time.time() - start) * 1000
         status = self.brain.status()["backend"]

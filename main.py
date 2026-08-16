@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 WELCOME = """
 ╔═══════════════════════════════════════════════════════════════╗
-║   🧬  CLARA-AGI  v1.3  —  Tác nhân tự chủ kiểu AGI          ║
+║   🧬  CLARA-AGI  v1.4  —  Tác nhân tự chủ kiểu AGI          ║
 ║     local-first · chạy CPU · tự học · tự phản tỉnh          ║
 ╚═══════════════════════════════════════════════════════════════╝
 """

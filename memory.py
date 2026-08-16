@@ -1,5 +1,5 @@
 """
-CLARA-AGI v1.1 - Bộ nhớ 3 lớp (Episodic / Semantic / Procedural) + Goals + Traits + User Model.
+CLARA-AGI v1.4 - Bộ nhớ 3 lớp (Episodic / Semantic / Procedural) + Goals + Traits + User Model + Embeddings recall.
 Không cần thư viện ngoài — dùng sqlite3 (Python mặc định).
 """
 import sqlite3, time, json, math, hashlib, os, unicodedata, re
