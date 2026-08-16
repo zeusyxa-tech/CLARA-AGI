@@ -38,6 +38,23 @@ def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, n
     return (j.get("response") or "").strip()
 
 
+def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400):
+    data = json.dumps({
+        "model": model, "messages": messages, "stream": False,
+        "options": {"temperature": temperature, "num_predict": num_predict,
+                    "top_p": 0.9, "seed": -1}
+    }).encode()
+    req = urllib.request.Request(f"{url}/api/chat", data=data,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            j = json.loads(resp.read())
+        choice = (((j.get("choices") or [{}])[0]).get("message") or {})
+        return (choice.get("content") or "").strip()
+    except Exception:
+        return None
+
+
 # ---------------- OPENAI-COMPATIBLE ----------------
 def openai_chat(prompt, model=DEFAULT_OLLAMA, base_url=OPENAI_API_BASE, api_key=OPENAI_API_KEY,
                 temperature=0.5, num_predict=400):
@@ -383,12 +400,21 @@ class Brain:
         out = ""
         if self.backend == "ollama":
             sys_prompt = self._tag_to_system(tag)
-            full = f"{sys_prompt}\n{prompt}"
+            messages = [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": prompt},
+            ]
             try:
-                out = ollama_chat(full, model=self.model, temperature=t,
-                                  num_predict=kw.get("num_predict", 400))
-            except Exception as e:
-                out = f"[ollama lỗi: {e}]\n"
+                out = ollama_chat_messages(messages, model=self.model, temperature=t,
+                                           num_predict=kw.get("num_predict", 400)) or ""
+            except Exception:
+                out = ""
+            if not out:
+                try:
+                    out = ollama_chat(f"{sys_prompt}\n{prompt}", model=self.model, temperature=t,
+                                      num_predict=kw.get("num_predict", 400))
+                except Exception as e:
+                    out = f"[ollama lỗi: {e}]\n"
         elif self.backend == "openai":
             sys_prompt = self._tag_to_system(tag)
             full = f"{sys_prompt}\n{prompt}"

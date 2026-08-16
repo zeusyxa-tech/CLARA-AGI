@@ -40,6 +40,7 @@ class ClarasAGI:
         self._study = None
         self._command_registry = {}
         self._init_command_registry()
+        self.history = []
         if _HAS_SCHEDULER:
             attach_study_commands(self)
             self._study = StudyScheduler(self, enabled=True, interval=120)
@@ -95,6 +96,10 @@ class ClarasAGI:
                 except Exception:
                     um_dict[u["k"]] = u["v"]
             self.wm.append({"role": "user_model", "content": um_dict})
+
+        # Chat history
+        if self.history:
+            self.wm.append({"role": "chat_history", "content": self.history[-6:]})
 
         # 3. FEEL
         uncertainty = self._uncertainty(text, sem, epi)
@@ -641,8 +646,12 @@ class ClarasAGI:
                 self.mem.learn("user_taught", fact, confidence=0.8, source="user_taught")
                 self.mem.remember_episode("learning", fact, importance=0.8, emotion=0.2)
         if re.match(r"^[A-Za-zÀ-ỹ0-9 _\-]{2,50}\s+(là|ở|thích|ghét|làm)\s+.+", text):
-            self.mem.learn("user_statement", text, confidence=0.7, source="user_taught")
-            self.mem.remember_episode("learning", text, importance=0.6, emotion=0.1)
+            # chặn học rác: không lưu nếu là câu hỏi
+            q_end = text.strip().endswith("?")
+            q_words = any(text.strip().lower().endswith(w) for w in ["gì", "sao", "nhỉ", "không?"])
+            if not q_end and not q_words:
+                self.mem.learn("user_statement", text, confidence=0.7, source="user_taught")
+                self.mem.remember_episode("learning", text, importance=0.6, emotion=0.1)
 
     def _update_user_model(self, text, answer, emotion):
         m = re.search(r"(?:tôi )?(?:tên là|tên)\s+([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ\s]{1,20}?)(?:\.|,|$|\s+và|\s+ở|\s+từ|\s+tuổi|\s+làm)", text)

@@ -11,6 +11,18 @@ DB_PATH = DB_DIR / "clara.db"
 WS_DIR = Path(__file__).parent / "workspace"
 WS_DIR.mkdir(exist_ok=True)
 
+try:
+    from embeddings import embed, cosine
+    _HAS_EMBED = True
+except Exception:
+    _HAS_EMBED = False
+
+
+def _embed(text):
+    if not _HAS_EMBED:
+        return None
+    return embed(text)
+
 
 def now(): return time.time()
 
@@ -268,14 +280,23 @@ class Memory:
                          (min_conf,)).fetchall()
         qw = set(self._tok(query))
         scored = []
+        try:
+            qvec = _embed(query)
+        except Exception:
+            qvec = None
         for r in rows:
             rw = set(self._tok(r["topic"] + " " + r["fact"]))
             overlap = len(qw & rw)
-            if overlap == 0: continue
+            if overlap == 0 and qvec is None:
+                continue
             common = qw & rw
             has_bigram = any("_" in tok for tok in common)
-            score = self._score_match(overlap, has_bigram) * r["confidence"] * (1 + math.log1p(r["access_count"]))
-            scored.append((score, dict(r)))
+            kw_score = self._score_match(overlap, has_bigram) * r["confidence"] * (1 + math.log1p(r["access_count"]))
+            if qvec is not None:
+                rvec = _embed(r["topic"] + " " + r["fact"])
+                if rvec is not None:
+                    kw_score = 0.55 * kw_score + 0.45 * (1 + cosine(qvec, rvec))
+            scored.append((kw_score, dict(r)))
         scored.sort(reverse=True, key=lambda x: x[0])
         return [r for _, r in scored[:limit]]
 
