@@ -8,29 +8,23 @@ import importlib
 import json
 import os
 import sqlite3
+import tempfile
+import threading
 import time
 from pathlib import Path
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-REPO = Path(__file__).resolve().parent
-
+REPO = Path(__file__).resolve().parent.parent
 os.chdir(REPO)
 
-import tempfile
+import sys
+sys.path.insert(0, str(REPO))
+
 
 _TMP_FIXTURE = tempfile.TemporaryDirectory()
 os.environ["CLARA_DB_DIR"] = _TMP_FIXTURE.name
 os.environ["CLARA_DB_PATH"] = str(Path(_TMP_FIXTURE.name) / "clara.db")
 os.environ["CLARA_OLLAMA_URL"] = "http://127.0.0.1:11434"
-
-
-def _ensure_language_column():
-    db = os.environ["CLARA_DB_PATH"]
-    try:
-        with sqlite3.connect(db, check_same_thread=False) as conn:
-            conn.execute("ALTER TABLE semantics ADD COLUMN language TEXT DEFAULT 'vi'")
-            conn.commit()
-    except Exception:
-        pass
 
 
 class TestRuntimeProfile:
@@ -199,8 +193,8 @@ class TestBrainRouting:
         assert "tool_name" in text
         assert "steps" in text
 
-    def test_native_chat_uses_message_content(self, monkeypatch):
-        captured = {}
+    def test_native_chat_message_content(self, monkeypatch):
+        captured = {"path": None}
 
         class FakeResp:
             def __enter__(self):
@@ -210,22 +204,32 @@ class TestBrainRouting:
                 return False
 
             def read(self):
-                return json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+                return json.dumps({"message": {"content": "native-ok"}}).encode()
 
             def close(self):
                 return None
 
         def fake_urlopen(req, timeout=None):
-            captured["url"] = req.full_url if hasattr(req, "full_url") else getattr(req, "full_url", None)
-            data = json.loads(req.data.decode())
-            captured["messages"] = data.get("messages", [])
+            captured["path"] = req.full_url if hasattr(req, "full_url") else getattr(req, "full_url", None)
             return FakeResp()
 
         monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
         from brain import ollama_chat_messages
         out = ollama_chat_messages([{"role": "system", "content": "sys"}, {"role": "user", "content": "hello"}], model="m", url="http://x")
-        assert out == "ok"
-        assert captured["messages"][1]["content"] == "hello"
+        assert out == "native-ok"
+        assert captured["path"] == "http://x/api/chat"
+
+    def test_native_chat_fake_server_no_generate_fallback(self, monkeypatch):
+        server = _FakeOllamaServer()
+        server.start()
+        try:
+            from brain import ollama_chat_messages
+            out = ollama_chat_messages([{"role": "user", "content": "hi"}], model="m", url=f"http://127.0.0.1:{server.port}")
+            assert out == "hi-server-ok"
+            assert server.generate_calls == 0
+            assert server.chat_calls == 1
+        finally:
+            server.stop()
 
 
 class TestLocaleDefaults:
@@ -243,7 +247,7 @@ class TestLocaleDefaults:
         monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
         monkeypatch.setenv("CLARA_LANGUAGE", "en")
         from brain import Brain
-        b = Brain(force_micro=True, language="en")
+        b = Brain(force_micro=True)
         assert b.language == "en"
 
     def test_user_message_not_lost_on_overflow(self, tmp_path, monkeypatch):
@@ -261,7 +265,6 @@ class TestLocaleDefaults:
     def test_unicode_nfc_and_no_diacritic_query(self, tmp_path, monkeypatch):
         monkeypatch.setenv("CLARA_DB_PATH", str(tmp_path / "clara.db"))
         monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
-        _ensure_language_column()
         import memory as memory_module
         importlib.reload(memory_module)
         from memory import Memory
@@ -357,3 +360,75 @@ class TestLocaleDefaults:
         reports = list(tmp_path.glob("idle_study_*.json"))
         assert reports
         assert all(str(r).startswith(str(tmp_path)) for r in reports)
+
+    def test_old_sqlite_schema_migrates_language_column(self, tmp_path, monkeypatch):
+        db = tmp_path / "old.db"
+        with sqlite3.connect(db, check_same_thread=False) as conn:
+            conn.execute("""
+                CREATE TABLE semantics(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL, topic TEXT, fact TEXT,
+                    confidence REAL DEFAULT 0.5,
+                    access_count INTEGER DEFAULT 0,
+                    last_access REAL,
+                    source TEXT DEFAULT 'learned'
+                );
+            """)
+            conn.commit()
+        monkeypatch.setenv("CLARA_DB_PATH", str(db))
+        monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
+        from memory import Memory
+        mem = Memory()
+        mem.learn("test", "Hà Nội đẹp.", confidence=0.8, language="vi")
+        row = dict(mem.conn.execute("SELECT fact, language FROM semantics WHERE topic=?", ("test",)).fetchone())
+        assert row is not None
+        assert row["fact"] == "Hà Nội đẹp."
+        assert row["language"] == "vi"
+
+
+class _FakeOllamaServer:
+    def __init__(self):
+        self.generate_calls = 0
+        self.chat_calls = 0
+        self.port = 0
+        self._thread = None
+        self._httpd = None
+
+    def start(self):
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *a, **k):
+                return
+
+            def do_POST(self):
+                if self.path.endswith("/api/generate"):
+                    server.generate_calls += 1
+                    self._respond({"response": "should-not-use"})
+                elif self.path.endswith("/api/chat"):
+                    server.chat_calls += 1
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(length)) if length else {}
+                    content = ""
+                    messages = body.get("messages", [])
+                    if messages and messages[-1].get("role") == "user":
+                        content = messages[-1].get("content", "")
+                    self._respond({"message": {"content": f"{content}-server-ok"}})
+                else:
+                    self._respond({}, code=404)
+
+            def _respond(self, payload, code=200):
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(payload).encode())
+
+        self._httpd = HTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self._httpd.server_address[1]
+        self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        if self._httpd:
+            self._httpd.shutdown()
+            self._httpd = None

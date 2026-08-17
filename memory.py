@@ -28,7 +28,9 @@ def now(): return time.time()
 
 
 class Memory:
-    def __init__(self, db_path=DB_PATH):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            db_path = Path(os.environ.get("CLARA_DB_PATH", "")) if os.environ.get("CLARA_DB_PATH") else DB_DIR / "clara.db"
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5.0)
         self.conn.row_factory = sqlite3.Row
         try:
@@ -121,6 +123,10 @@ class Memory:
         try:
             self.conn.execute("ALTER TABLE semantics ADD COLUMN fingerprint TEXT")
             self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS sem_fingerprint ON semantics(fingerprint)")
+        except Exception:
+            pass
+        try:
+            self.conn.execute("ALTER TABLE semantics ADD COLUMN language TEXT DEFAULT 'vi'")
         except Exception:
             pass
 

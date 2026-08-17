@@ -54,8 +54,11 @@ def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, tempera
         close = getattr(resp, "close", None)
         if callable(close):
             close()
-    choice = (((j.get("choices") or [{}])[0]).get("message") or {})
-    content = (choice.get("content") or "").strip()
+    msg = j.get("message") or {}
+    if not msg:
+        choice = (((j.get("choices") or [{}])[0]).get("message") or {})
+        msg = choice
+    content = (msg.get("content") or "").strip()
     return content if content is not None else ""
 
 
