@@ -402,9 +402,8 @@ class Brain:
 
     def think(self, tag, prompt, **kw):
         t = kw.get("temperature", self.temperature)
-        out = ""
+        sys_prompt = self._tag_to_system(tag)
         if self.backend == "ollama":
-            sys_prompt = self._tag_to_system(tag)
             messages = [
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": prompt},
@@ -421,20 +420,21 @@ class Brain:
                 except Exception as e:
                     out = f"[ollama lỗi: {e}]\n"
         elif self.backend == "openai":
-            sys_prompt = self._tag_to_system(tag)
             full = f"{sys_prompt}\n{prompt}"
             try:
                 out = openai_chat(full, model=self.model, temperature=t,
                                   num_predict=kw.get("num_predict", 400))
             except Exception as e:
                 out = f"[openai lỗi: {e}]\n"
+        else:
+            out = ""
         out = strip_think(out)
         if out and len(out.strip()) > 2:
             return out.strip()
         return self.micro.think(tag, prompt)
 
     def _tag_to_system(self, tag):
-        return system_for(tag)
+        return system_for(tag, language=self.language)
 
     def status(self):
         return {"backend": self.backend,

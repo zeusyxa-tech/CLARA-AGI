@@ -304,6 +304,28 @@ class TestLocaleDefaults:
         study = getattr(agi, "_study", None)
         assert study is None or getattr(study, "_running", False) is False
 
+    def test_web_tools_gated_by_allow_network(self, monkeypatch):
+        import web_tools
+        monkeypatch.setattr("web_tools._NETWORK_ALLOWED", False)
+        err_search = web_tools.web_search("python tips", max_results=1)
+        assert any("error" in x and "Mạng đã tắt" in x.get("error", "") for x in err_search)
+        err_fetch = web_tools.web_fetch("https://example.com")
+        assert "Mạng đã tắt" in err_fetch
+
+    def test_approve_reject_candidate_flow(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLARA_DB_PATH", str(tmp_path / "clara.db"))
+        monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
+        from agent import ClarasAGI
+        agi = ClarasAGI(force_micro=True)
+        agi.mem.add_candidate(topic="x", fact="y", source="test", confidence=0.5, reason="test")
+        cands = agi.mem.review_candidates(limit=5)
+        assert cands
+        cid = cands[0]["id"]
+        out1 = agi.chat(f"approve memory {cid}")
+        assert "✅" in out1
+        out2 = agi.chat(f"reject memory {cid}")
+        assert "🗑️" in out2 or "❌" in out2
+
     def test_idle_study_writes_report_under_tmp(self, tmp_path, monkeypatch):
         from bounded_autolearn import run_idle_study_session
         monkeypatch.setattr("bounded_autolearn.REPORT_DIR", tmp_path)

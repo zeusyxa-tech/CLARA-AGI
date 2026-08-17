@@ -49,6 +49,8 @@ def print_status(agi):
 
 def run_cli(args):
     from agent import ClarasAGI
+    from web_tools import allow_network as _allow_network
+    _allow_network(args.allow_network)
     agi = ClarasAGI(force_micro=args.micro, model=args.model,
                     dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
                     profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,

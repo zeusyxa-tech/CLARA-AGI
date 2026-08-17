@@ -5,6 +5,19 @@ Không cần API key — dùng DuckDuckGo HTML search + urllib, hoàn toàn mi�
 import re, json, urllib.request, urllib.parse, html as html_mod
 from html.parser import HTMLParser
 
+_NETWORK_ALLOWED = False
+
+
+def allow_network(enabled: bool):
+    global _NETWORK_ALLOWED
+    _NETWORK_ALLOWED = bool(enabled)
+
+
+def _check_network():
+    if not _NETWORK_ALLOWED:
+        return {"error": "Mạng đã tắt: bật --allow-network để sử dụng web research."}
+    return None
+
 
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 
@@ -37,6 +50,9 @@ def _request(url, timeout=15):
 
 def web_search(query, max_results=5):
     """Tìm kiếm DuckDuckGo, trả về list {title, url, snippet}."""
+    err = _check_network()
+    if err:
+        return [err]
     try:
         q = urllib.parse.quote_plus(query)
         url = f"https://html.duckduckgo.com/html/?q={q}"
@@ -72,6 +88,9 @@ def web_search(query, max_results=5):
 
 def web_fetch(url, max_chars=4000):
     """Đọc nội dung 1 trang web, trả về text thô (bỏ HTML)."""
+    err = _check_network()
+    if err:
+        return err["error"]
     # chặn file:// và nội bộ
     if url.startswith("file:") or url.startswith("localhost") or url.startswith("127."):
         return "❌ Không cho phép truy cập nội bộ."

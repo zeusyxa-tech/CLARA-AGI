@@ -490,8 +490,9 @@ class Memory:
         if old:
             self.conn.execute("UPDATE semantics SET confidence=min(1.0, confidence+0.05), last_access=? WHERE id=?", (now(), old["id"]))
         else:
+            confidence = min(1.0, float(r["confidence"] or 0.5) + 0.1)
             self.conn.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source) VALUES(?,?,?,?,?,?)",
-                               (now(), r["topic"], fact, min(1.0, (r.get("confidence") or 0.5) + 0.1), now(), "user_approved"))
+                               (now(), r["topic"], fact, confidence, now(), "user_approved"))
         self.conn.execute("UPDATE candidate_memory SET status='trusted', reason='approved' WHERE id=?", (cid,))
         self.conn.commit()
         return True
