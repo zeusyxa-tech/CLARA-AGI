@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from brain import T_ANSWER, Brain
+from prompts_vi import ANSWER_SYSTEM_VI
 
 REPORT_DIR = Path(__file__).resolve().parent / "data" / "benchmarks"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -20,6 +21,10 @@ PROMPTS = [
     "Tóm tắt ngắn gọn: spaced repetition là gì và áp dụng thế nào cho học code?",
     "Viết kế hoạch 4 bước để tạo một tool chat đơn giản bằng Python.",
 ]
+BENCHMARK_SYSTEM = (
+    "Bạn là benchmark evaluator. Đánh giá câu trả lời sau bằng tiếng Việt ngắn gọn, "
+    "chấm điểm 1-10 theo độ đúng/đủ, và ghi rõ điểm mạnh/điểm yếu."
+)
 
 
 def _peak_rss() -> int | None:
@@ -32,6 +37,16 @@ def _peak_rss() -> int | None:
 
 def run_benchmark(model: str, backend: str = "ollama") -> dict:
     brain = Brain(force_micro=(backend != "ollama"), model=model)
+    if brain.backend == "micro":
+        return {
+            "model": model,
+            "backend": "micro",
+            "provider_model": brain.model,
+            "results": [],
+            "peak_rss_bytes": _peak_rss(),
+            "recommendation": "unavailable",
+            "reason": "Ollama/model không khả dụng; benchmark chỉ chạy trên backend thật.",
+        }
     results = []
     for prompt in PROMPTS:
         t0 = time.perf_counter()

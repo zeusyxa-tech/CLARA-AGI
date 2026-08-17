@@ -4,6 +4,7 @@ Hỗ trợ: Ollama local (tự nhận), fallback là MicroLLM (template, chạy 
 """
 import json, urllib.request, re, time, os, hashlib, unicodedata
 from pathlib import Path
+from prompts_vi import system_for, language_name, normalize_language
 
 DEFAULT_OLLAMA = "qwen2.5:1.5b"
 CANDIDATE_MODELS = [
@@ -46,13 +47,16 @@ def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, tempera
     }).encode()
     req = urllib.request.Request(f"{url}/api/chat", data=data,
                                  headers={"Content-Type": "application/json"})
+    resp = urllib.request.urlopen(req, timeout=120)
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            j = json.loads(resp.read())
-        choice = (((j.get("choices") or [{}])[0]).get("message") or {})
-        return (choice.get("content") or "").strip()
-    except Exception:
-        return None
+        j = json.loads(resp.read())
+    finally:
+        close = getattr(resp, "close", None)
+        if callable(close):
+            close()
+    choice = (((j.get("choices") or [{}])[0]).get("message") or {})
+    content = (choice.get("content") or "").strip()
+    return content if content is not None else ""
 
 
 # ---------------- OPENAI-COMPATIBLE ----------------
@@ -381,12 +385,13 @@ class MicroLLM:
 
 # ---------------- BRAIN CHUNG ----------------
 class Brain:
-    def __init__(self, force_micro=False, model=None):
+    def __init__(self, force_micro=False, model=None, language=None):
         self.models = ollama_list()
         self.backend = "micro"
         self.model = model or DEFAULT_OLLAMA
         self.micro = MicroLLM()
         self.temperature = 0.5
+        self.language = normalize_language(language or os.environ.get("CLARA_LANGUAGE"), default="vi")
         if not force_micro and self.models is not None:
             names = [m.get("name","") for m in self.models]
             for cand in [self.model] + CANDIDATE_MODELS:
@@ -429,30 +434,10 @@ class Brain:
         return self.micro.think(tag, prompt)
 
     def _tag_to_system(self, tag):
-        mapping = {
-            T_PLAN:    ("Bạn là bộ phận lên kế hoạch của một agent AGI-like. "
-                        "Hãy phân tích yêu cầu người dùng và trả về DUY NHẤT một đối tượng JSON hợp lệ "
-                        "với các khóa: steps (mảng các bước ngắn), needs_tool (boolean), "
-                        "tool_name (string: calc/read/write/list/run_python/search/now/none), "
-                        "tool_args (string: các tham số cho tool, vd '15 * (2+3)' cho calc). Không trả về gì khác ngoài JSON."),
-            T_TOOL:    ("Dựa trên kế hoạch trên, hãy chọn công cụ phù hợp nhất. "
-                        "Trả về DUY NHẤT một dòng: '<tool_name> <args>'. "
-                        "Ví dụ: 'calc 15*(2+3)' hoặc 'read note.txt' hoặc 'none'."),
-            T_REFLECT: ("Bạn là module tự phản tỉnh. Hãy phê bình câu trả lời sau (tìm lỗi, chỗ yếu, chỗ quá chung chung) "
-                        "và cho điểm trên thang 10. Trả lời ngắn gọn."),
-            T_REWRITE: ("Dựa trên lời phê bình, hãy viết LẠI câu trả lời sao cho tốt hơn. "
-                        "Chỉ trả về câu trả lời mới bằng tiếng Việt, ngắn gọn (2-4 câu), không giải thích thêm."),
-            T_ANSWER:  ("Bạn là CLARA-AGI, tác nhân tự chủ chạy local. "
-                        "Dùng thông tin trong WORKSPACE và kết quả công cụ để trả lời người dùng bằng tiếng Việt, "
-                        "tự nhiên, ngắn gọn (2-5 câu). Thành thật khi không biết, không bịa đặt."),
-            T_SKILL:   ("Từ lỗi/mistake sau, hãy đề xuất một skill (thủ tục) mới dưới dạng JSON: "
-                        "{\"name\":\"...\",\"description\":\"...\",\"steps\":[...]}. steps là mảng câu ngắn mô tả cách xử lý đúng."),
-            T_DREAM:   ("Bạn là module tổng hợp khi 'ngủ'. Hãy đọc các episode gần đây, rút ra 2-3 bài học ngắn, "
-                        "trả về JSON {\"summary\":\"...\",\"lessons\":[...]}. Tiếng Việt."),
-        }
-        return mapping.get(tag, "Trả lời ngắn gọn bằng tiếng Việt.")
+        return system_for(tag)
 
     def status(self):
         return {"backend": self.backend,
                 "model": self.model if self.backend == "ollama" else "micro-template",
-                "available_models": [m.get("name") for m in (self.models or [])][:10]}
+                "available_models": [m.get("name") for m in (self.models or [])][:10],
+                "language": getattr(self, "language", "vi")}

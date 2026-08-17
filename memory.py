@@ -54,7 +54,8 @@ class Memory:
             confidence REAL DEFAULT 0.5,
             access_count INTEGER DEFAULT 0,
             last_access REAL,
-            source TEXT DEFAULT 'learned'
+            source TEXT DEFAULT 'learned',
+            language TEXT DEFAULT 'vi'
         );
         CREATE TABLE IF NOT EXISTS procedures(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -256,11 +257,12 @@ class Memory:
         return [r for _, r in scored[:limit]]
 
     # ---------------- SEMANTICS ----------------
-    def learn(self, topic, fact, confidence=0.6, source="learned"):
+    def learn(self, topic, fact, confidence=0.6, source="learned", language=None):
         fact = fact.strip()
         if not fact: return
         c = self.conn.cursor()
         old = c.execute("SELECT id, confidence, access_count, source, ts FROM semantics WHERE fact=?", (fact,)).fetchone()
+        lang = language or self._detect_language(fact) or "vi"
         if old:
             boost = 0.05
             raw_src = (old["source"] or "")
@@ -278,12 +280,12 @@ class Memory:
                 self.conn.commit()
                 return old["id"]
             nc = min(1.0, max(old["confidence"], confidence) + boost)
-            c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=?, source=? WHERE id=?",
-                      (nc, old["access_count"]+1, now(), source, old["id"]))
+            c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=?, source=?, language=? WHERE id=?",
+                      (nc, old["access_count"]+1, now(), source, lang, old["id"]))
             self.conn.commit()
             return old["id"]
-        c.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source) VALUES(?,?,?,?,?,?)",
-                  (now(), topic.strip() if topic else "general", fact, confidence, now(), source))
+        c.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source,language) VALUES(?,?,?,?,?,?,?)",
+                  (now(), topic.strip() if topic else "general", fact, confidence, now(), source, lang))
         self.conn.commit()
         return c.lastrowid
 
@@ -305,8 +307,22 @@ class Memory:
             rw = set(self._tok(r["topic"] + " " + r["fact"]))
             overlap = len(qw & rw)
             if overlap == 0 and qvec is None:
+                q_ascii = self._normalize_ascii(query)
+                r_ascii = self._normalize_ascii(r["topic"] + " " + r["fact"])
+                if q_ascii and r_ascii:
+                    qw_ascii = set(self._tok(q_ascii))
+                    rw_ascii = set(self._tok(r_ascii))
+                    overlap = len(qw_ascii & rw_ascii)
+            if overlap == 0 and qvec is None:
                 continue
-            common = qw & rw
+            if qvec is not None and overlap == 0:
+                common = set()
+            elif qw and rw:
+                common = qw & rw
+            else:
+                common = set()
+            if overlap and not common:
+                common = set(self._tok(query)) & set(self._tok(r["topic"] + " " + r["fact"]))
             has_bigram = any("_" in tok for tok in common)
             kw_score = self._score_match(overlap, has_bigram) * r["confidence"] * (1 + math.log1p(r["access_count"]))
             if qvec is not None:
@@ -489,6 +505,20 @@ class Memory:
         return True
 
     # ---------------- UTIL ----------------
+    def _detect_language(self, text: str) -> str | None:
+        if not text:
+            return None
+        ascii_text = text.encode("ascii", "ignore").decode("ascii")
+        if len(ascii_text) < len(text):
+            return "vi"
+        return None
+
+    @staticmethod
+    def _normalize_ascii(text: str) -> str:
+        nfkd = unicodedata.normalize("NFKD", text)
+        ascii_text = nfkd.encode("ascii", "ignore").decode("ascii")
+        return " ".join(ascii_text.split())
+
     def _normalize(self, s: str) -> str:
         s = unicodedata.normalize("NFC", s).lower()
         s = "".join(ch if unicodedata.category(ch)[0] not in "P" else " " for ch in s)

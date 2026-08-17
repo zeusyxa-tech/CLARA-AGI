@@ -272,7 +272,7 @@ Code chỉ vài trăm dòng mỗi file, dễ đọc dễ sửa. Các ý tưởng
 - **Bounded idle-study**: thêm `--idle-study` opt-in, giới hạn thời gian/topics/facts; không tự đổi code/skill, chỉ ghi report vào `data/growth_reports`.
 - **Model routing without silent fallback**: ghi rõ backend/model đang dùng; cảnh báo micro fallback rõ lý do.
 - **Benchmark-only mode**: `--benchmark-model <installed-model>` chạy 3 prompt ngắn, ghi report vào `data/benchmarks`, không tải model.
-- **Evaluation**: bộ test offline kiểm tra governor, degraded mode, bounded idle-study, CLI flags, brain routing.
+- **Evaluation**: bộ test offline kiểm tra governor, degraded mode, bounded idle-study, CLI flags, brain routing, language default, feedback tiếng Việt.
 
 ## 📝 Changelog v1.4
 

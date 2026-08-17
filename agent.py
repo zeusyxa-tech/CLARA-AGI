@@ -21,12 +21,14 @@ except Exception:
 
 class ClarasAGI:
     def __init__(self, force_micro=False, model=None, dream_every=10, auto_skill=True,
-                 profile="mobile_12gb_safe", idle_study=False, allow_network=False):
+                 profile="mobile_12gb_safe", idle_study=False, allow_network=False,
+                 language=None):
         self.mem = Memory()
-        self.brain = Brain(force_micro=force_micro, model=model)
+        self.brain = Brain(force_micro=force_micro, model=model, language=language or "vi")
         self.wm = []
         self.dream_every = dream_every
         self.auto_skill = auto_skill
+        self.language = self.brain.language
         self.turn_count = self.mem.get_trait("turn_count", 0) or 0
         self.traits = {
             "name": self.mem.get_trait("name", "CLARA"),
@@ -47,9 +49,10 @@ class ClarasAGI:
         self.allow_network = allow_network
         if _HAS_SCHEDULER:
             attach_study_commands(self)
-            self._study = StudyScheduler(self, enabled=True, interval=120)
+            self._study = StudyScheduler(self, enabled=False, interval=120)
             try:
-                self._study.start()
+                if getattr(self, "idle_study", False):
+                    self._study.start()
             except Exception:
                 pass
 
@@ -277,13 +280,15 @@ class ClarasAGI:
         self._register_command("review candidates", lambda agi, text: agi._review_candidates())
         self._register_command("approve memory", lambda agi, text: agi._approve_memory(text))
         self._register_command("reject memory", lambda agi, text: agi._reject_memory(text))
+        self._register_command("góp ý ngôn ngữ", lambda agi, text: agi._language_feedback(text))
+        self._register_command("idle-study", lambda agi, text: agi._run_idle_study())
         self._register_command("growth status", lambda agi, text: agi._growth_status())
         self._register_command("growth report", lambda agi, text: agi._growth_report())
 
     def _handle_special_commands(self, text):
         low = text.lower().strip()
         for key, fn in self._command_registry.items():
-            if low == key or low.startswith(key + " "):
+            if low == key or low.startswith(key + " ") or low.startswith(key + ":"):
                 return fn(self, text)
         return None
 
@@ -649,12 +654,19 @@ class ClarasAGI:
 
     def _compact_wm(self):
         out = []
+        # Luôn giữ lại tin nhắn người dùng hiện tại nếu còn trong wm
+        current_user = None
+        for item in reversed(self.wm):
+            if item.get("role") == "user" and current_user is None:
+                current_user = item
         for item in self.wm[-8:]:
             role = item.get("role")
             content = item.get("content")
             if isinstance(content, (dict, list)):
                 content = json.dumps(content, ensure_ascii=False)
             out.append({"role": role, "content": content})
+        if current_user is not None and not any(i.get("role") == "user" and i.get("content") == current_user.get("content") for i in out):
+            out.insert(0, current_user)
         return out
 
     def _auto_learn(self, text, answer):
@@ -755,9 +767,11 @@ class ClarasAGI:
     def _runtime_status(self):
         try:
             from runtime_profile import governor_status
-            return governor_status(self.profile_name, self.brain.model if self.brain.backend != "micro" else "micro-template", self.brain.backend)
+            rt = governor_status(self.profile_name, self.brain.model if self.brain.backend != "micro" else "micro-template", self.brain.backend)
+            rt["language"] = self.language
+            return rt
         except Exception as e:
-            return {"profile": self.profile_name, "mode": "chat", "backend": self.brain.backend, "provider_model": self.brain.model, "error": str(e)}
+            return {"profile": self.profile_name, "mode": "chat", "backend": self.brain.backend, "provider_model": self.brain.model, "language": self.language, "error": str(e)}
 
     def _review_candidates(self):
         rows = self.mem.review_candidates(limit=20)
@@ -791,7 +805,7 @@ class ClarasAGI:
             rt = {"profile": self.profile_name, "mode": "chat", "degraded_reason": None}
         lines = [
             "📊 Growth status:",
-            f"  profile={rt.get('profile')} mode={rt.get('mode')} degraded={rt.get('degraded_reason')}",
+            f"  profile={rt.get('profile')} mode={rt.get('mode')} degraded={rt.get('degraded_reason')} language={getattr(self, 'language', 'vi')}",
             f"  candidates pending={st.get('candidates_pending')} trusted={st.get('candidates_trusted')}",
             f"  idle_study enabled={bool(getattr(self, 'idle_study', False))} allow_network={bool(getattr(self, 'allow_network', False))}",
         ]
@@ -812,3 +826,29 @@ class ClarasAGI:
             }, ensure_ascii=False, indent=2)
         except Exception as e:
             return f"❌ Không đọc được report: {e}"
+
+    def _language_feedback(self, text):
+        rest = text[len("góp ý ngôn ngữ"):].strip()
+        if not rest:
+            return "Dùng: góp ý ngôn ngữ: <cách diễn đạt đúng/đẹp hơn>"
+        self.mem.add_candidate(
+            topic="language_feedback",
+            fact=rest,
+            source="user_language_feedback",
+            confidence=0.7,
+            reason="user language correction",
+        )
+        return "✅ Đã ghi nhận góp ý ngôn ngữ. Bạn có thể duyệt bằng 'review candidates' rồi 'approve memory <id>'."
+
+    def _run_idle_study(self):
+        try:
+            from bounded_autolearn import run_idle_study_session
+            report = run_idle_study_session(
+                self,
+                profile_name=getattr(self, "profile_name", "mobile_12gb_safe"),
+                force=False,
+                allow_network=bool(getattr(self, "allow_network", False)),
+            )
+            return json.dumps(report, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"❌ idle-study lỗi: {e}"

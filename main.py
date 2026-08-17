@@ -51,7 +51,8 @@ def run_cli(args):
     from agent import ClarasAGI
     agi = ClarasAGI(force_micro=args.micro, model=args.model,
                     dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
-                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network)
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                    language=args.language or os.environ.get("CLARA_LANGUAGE"))
     print(WELCOME)
     print_status(agi)
 
@@ -282,7 +283,10 @@ def main():
     ap.add_argument("--allow-network", action="store_true", help="Cho phép network trong idle-study (mặc định tắt)")
     ap.add_argument("--benchmark-model", type=str, default=None, help="Benchmark exact installed model; no download")
     ap.add_argument("--benchmark-provider", type=str, default="ollama", help="Backend for benchmark")
+    ap.add_argument("--language", type=str, default=None, help="Ngôn ngữ ưu tiên: vi|en|auto")
     args = ap.parse_args()
+    raw_lang = args.language or os.environ.get("CLARA_LANGUAGE") or "vi"
+    args.language = raw_lang
 
     if args.benchmark_model:
         try:
