@@ -676,20 +676,18 @@ class ClarasAGI:
             job = m.group(1).strip()
             if job.lower() not in ("ai","gì","đây","đó","clara"):
                 self.mem.set_user("job", job, confidence=0.7)
-        likes = re.findall(r"tôi\s+(?:thích|yêu|hay|đam\s+mê)\s+(.+?)(?:\.|,|$|\s+và|\s+tôi|\s+ở)", text, re.I)
-        dislikes = re.findall(r"tôi\s+ghét\s+(.+?)(?:\.|,|$|\s+và|\s+tôi|\s+ở)", text, re.I)
-        if likes:
-            for item in likes:
-                item = item.strip()
-                if item:
-                    self.mem.set_user("likes", [item], confidence=0.85, merge=True)
-                    self.mem.learn("user_preference", f"Người dùng thích {item}", confidence=0.8, source="user_taught")
-        if dislikes:
-            for item in dislikes:
-                item = item.strip()
-                if item:
-                    self.mem.set_user("dislikes", [item], confidence=0.85, merge=True)
-                    self.mem.learn("user_preference", f"Người dùng ghét {item}", confidence=0.8, source="user_taught")
+        likes = re.findall(r"tôi\s+(?:thích|yêu|hay\s+(?:uống|ăn|chơi|đọc|xem|nghe)|đam\s+mê)\s+([^.,;?!]+)", text, re.I)
+        dislikes = re.findall(r"tôi\s+ghét\s+([^.,;?!]+)", text, re.I)
+        q_words = {"gì", "sao", "nhỉ", "không", "ở đâu", "bao nhiêu", "khi nào", "tại sao"}
+        is_question = text.strip().endswith("?") or any(text.strip().lower().endswith(w) for w in q_words)
+        if likes or dislikes:
+            if not is_question:
+                for item in likes + dislikes:
+                    item = item.strip()
+                    if item and item.lower() not in q_words and len(item) >= 2:
+                        key = "likes" if item in likes else "dislikes"
+                        self.mem.set_user(key, [item], confidence=0.85, merge=True)
+                        self.mem.learn("user_preference", f"Người dùng {'thích' if key=='likes' else 'ghét'} {item}", confidence=0.8, source="user_taught")
         if emotion < -0.3:
             self.traits["empathy"] = min(1.0, self.traits["empathy"] + 0.02)
             self.mem.set_trait("empathy", self.traits["empathy"])

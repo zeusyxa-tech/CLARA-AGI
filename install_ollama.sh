@@ -34,6 +34,9 @@ esac
 
 echo "📥 Đang pull model $MODEL_NAME (có thể mất vài phút)..."
 ollama pull "$MODEL_NAME"
+echo ""
+echo "📥 Đang pull embedding model nomic-embed-text..."
+ollama pull nomic-embed-text || true
 
 echo ""
 echo "✅ Xong! Bạn có thể chạy CLARA:"

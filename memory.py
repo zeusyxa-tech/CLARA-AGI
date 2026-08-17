@@ -5,9 +5,9 @@ Không cần thư viện ngoài — dùng sqlite3 (Python mặc định).
 import sqlite3, time, json, math, hashlib, os, unicodedata, re
 from pathlib import Path
 
-DB_DIR = Path(__file__).parent / "data"
+DB_DIR = Path(os.environ.get("CLARA_DB_DIR", "")) if os.environ.get("CLARA_DB_DIR") else Path(__file__).parent / "data"
 DB_DIR.mkdir(exist_ok=True)
-DB_PATH = DB_DIR / "clara.db"
+DB_PATH = Path(os.environ.get("CLARA_DB_PATH", "")) if os.environ.get("CLARA_DB_PATH") else DB_DIR / "clara.db"
 WS_DIR = Path(__file__).parent / "workspace"
 WS_DIR.mkdir(exist_ok=True)
 
@@ -93,6 +93,12 @@ class Memory:
         );
         CREATE TABLE IF NOT EXISTS topic_history(
             topic TEXT PRIMARY KEY, last_picked REAL, count INTEGER DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS semantics_embeddings(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            model TEXT,
+            vector TEXT,
+            ts REAL
         );
         CREATE INDEX IF NOT EXISTS ep_ts ON episodes(ts);
         CREATE INDEX IF NOT EXISTS ep_kind ON episodes(kind);

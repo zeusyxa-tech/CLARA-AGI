@@ -257,12 +257,22 @@ Ollama tự động dùng GPU nếu nhận được card đồ họa tương th�
 
 Code chỉ vài trăm dòng mỗi file, dễ đọc dễ sửa. Các ý tưởng hay để mở rộng:
 
-- [ ] Thêm công cụ **duyệt web** (qua `requests` + `BeautifulSoup`) — cho CLARA tự tìm thông tin mới
-- [ ] Thêm **vector search thật** (sqlite-vss hoặc `sentence-transformers/all-MiniLM-L6-v2`) để tìm ngữ nghĩa chính xác hơn
-- [ ] Thêm **multi-agent** — nhiều instance CLARA nói chuyện với nhau (debate, hợp tác giải quyết vấn đề)
-- [ ] Thêm **planning dài hạn** (mục tiêu nhiều bước, theo dõi tiến độ)
-- [ ] Tích hợp **vision** (mô hình Moondream hoặc LLaVA qua Ollama) để CLARA nhìn ảnh/màn hình
-- [ ] **Self-modification có kiểm soát** — CLARA đề xuất thay đổi code của chính nó và yêu cầu bạn duyệt trước khi áp dụng
+- [x] Thêm công cụ **duyệt web** (qua `requests` + `BeautifulSoup`) — cho CLARA tự tìm thông tin mới
+- [x] Thêm **vector search thật** (sqlite-vss hoặc `sentence-transformers/all-MiniLM-L6-v2`) để tìm ngữ nghĩa chính xác hơn
+- [x] Thêm **multi-agent** — nhiều instance CLARA nói chuyện với nhau (debate, hợp tác giải quyết vấn đề)
+- [x] Thêm **planning dài hạn** (mục tiêu nhiều bước, theo dõi tiến độ)
+- [x] Tích hợp **vision** (mô hình Moondream hoặc LLaVA qua Ollama) để CLARA nhìn ảnh/màn hình
+- [x] **Self-modification có kiểm soát** — CLARA đề xuất thay đổi code của chính nó và yêu cầu bạn duyệt trước khi áp dụng
+
+## 📝 Changelog v1.4
+
+- **Smarter user answers**: CLARA không còn trả lời sai khi hỏi về người dùng; nó đọc trực tiếp `user_model` và trả lời đúng dữ liệu đã lưu.
+- **Preference extraction**: Tự nhận "tôi thích/ghét/yêu ..." và lưu vào `likes`/`dislikes`, đồng thời học thêm vào semantic memory.
+- **Stop junk learning**: Không lưu câu hỏi vào `user_statement` nữa; chỉ lưu mệnh đề thực tế.
+- **Chat history**: Lưu tối đa 8 lượt hội thoại gần nhất vào working memory để trả lời đa lượt tự nhiên hơn.
+- **Embedding recall**: Thêm module `embeddings.py`, cache vector vào SQLite; `recall_semantics()` kết hợp keyword + cosine similarity khi Ollama/model embedding có sẵn.
+- **Brain `/api/chat`**: Brain Ollama giờ dùng `POST /api/chat` với `messages=[{role:system,...},{role:user,...}]`, fallback về `/api/generate` nếu lỗi.
+- **Version alignment**: Thống nhất toàn repo về v1.4.
 
 ---
 
