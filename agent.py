@@ -20,7 +20,8 @@ except Exception:
 
 
 class ClarasAGI:
-    def __init__(self, force_micro=False, model=None, dream_every=10, auto_skill=True):
+    def __init__(self, force_micro=False, model=None, dream_every=10, auto_skill=True,
+                 profile="mobile_12gb_safe", idle_study=False, allow_network=False):
         self.mem = Memory()
         self.brain = Brain(force_micro=force_micro, model=model)
         self.wm = []
@@ -29,7 +30,7 @@ class ClarasAGI:
         self.turn_count = self.mem.get_trait("turn_count", 0) or 0
         self.traits = {
             "name": self.mem.get_trait("name", "CLARA"),
-            "version": self.mem.get_trait("version", "1.3"),
+            "version": self.mem.get_trait("version", "1.4"),
             "born_at": float(self.mem.get_trait("born_at", time.time()) or time.time()),
             "curiosity": self.mem.get_trait("curiosity", 0.7),
             "honesty": self.mem.get_trait("honesty", 0.9),
@@ -41,6 +42,9 @@ class ClarasAGI:
         self._command_registry = {}
         self._init_command_registry()
         self.history = []
+        self.profile_name = profile
+        self.idle_study = idle_study
+        self.allow_network = allow_network
         if _HAS_SCHEDULER:
             attach_study_commands(self)
             self._study = StudyScheduler(self, enabled=True, interval=120)
@@ -270,6 +274,11 @@ class ClarasAGI:
         self._register_command("income_opportunity_finder", lambda agi, text: agi._income_opportunity_finder(text[len("income_opportunity_finder"):].strip()))
         self._register_command("opportunity", lambda agi, text: agi._income_opportunity_finder(text[len("opportunity"):].strip()))
         self._register_command("income_portfolio", lambda agi, text: agi._income_portfolio(text[len("income_portfolio"):].strip()))
+        self._register_command("review candidates", lambda agi, text: agi._review_candidates())
+        self._register_command("approve memory", lambda agi, text: agi._approve_memory(text))
+        self._register_command("reject memory", lambda agi, text: agi._reject_memory(text))
+        self._register_command("growth status", lambda agi, text: agi._growth_status())
+        self._register_command("growth report", lambda agi, text: agi._growth_report())
 
     def _handle_special_commands(self, text):
         low = text.lower().strip()
@@ -501,7 +510,7 @@ class ClarasAGI:
 
     def _help_text(self):
         s = self.status()
-        return (
+        base = (
             f"🤖 Xin chào! Tôi là {self.traits['name']}-AGI v{self.traits['version']}.\n"
             f"🧠 Backend: {s['brain']['backend']} ({s['brain']['model']})\n"
             f"💾 Trí nhớ: {s['memory']['episodes']} episodes, {s['memory']['semantics']} facts, "
@@ -509,9 +518,16 @@ class ClarasAGI:
             f"🎯 Mục tiêu đang hoạt động: {s['memory']['active_goals']}\n"
             "\nTôi có thể: nhớ kiến thức, học từ feedback, tính toán, đọc/ghi file, chạy code Python, "
             "tự phản tỉnh và tự viết lại câu trả lời, tự tạo skill mới khi gặp lỗi, "
-            "tự tổng hợp kiến thức khi 'ngủ mơ'."
+            "tự tổng hợp kiến thức khi 'ngủ mơ'.\n"
+            "\nGrowth (opt-in):\n"
+            "  review candidates        xem facts chờ duyệt\n"
+            "  approve memory <id>      duyệt candidate → trusted\n"
+            "  reject memory <id>       từ chối candidate\n"
+            "  growth status            xem quota/state\n"
+            "  growth report            xem báo cáo idle-study gần nhất\n"
             "\nGõ 'commands' để xem toàn bộ lệnh."
         )
+        return base
 
     # ------------------ HELPERS ------------------
     def _detect_emotion(self, text):
@@ -720,8 +736,10 @@ class ClarasAGI:
         return tags
 
     def status(self):
+        brain = self.brain.status()
+        runtime = self._runtime_status()
         return {
-            "brain": self.brain.status(),
+            "brain": brain,
             "memory": self.mem.stats(),
             "traits": {k: (round(v,3) if isinstance(v,float) else v) for k,v in self.traits.items()},
             "workspace_size": len(self.wm),
@@ -731,4 +749,66 @@ class ClarasAGI:
             "dreams": self.mem.stats()["dreams"],
             "recent_dreams": [{"ts": d["ts"], "summary": d["summary"][:80]}
                                for d in self.mem.recent_dreams(3)],
+            "runtime": runtime,
         }
+
+    def _runtime_status(self):
+        try:
+            from runtime_profile import governor_status
+            return governor_status(self.profile_name, self.brain.model if self.brain.backend != "micro" else "micro-template", self.brain.backend)
+        except Exception as e:
+            return {"profile": self.profile_name, "mode": "chat", "backend": self.brain.backend, "provider_model": self.brain.model, "error": str(e)}
+
+    def _review_candidates(self):
+        rows = self.mem.review_candidates(limit=20)
+        if not rows:
+            return "📭 Không có candidate đang chờ duyệt."
+        lines = [f"📋 Candidate ({len(rows)}):"]
+        for r in rows:
+            lines.append(f"  • id={r['id']} | {r['topic']} | src={r['source']} | conf={r['confidence']:.2f}")
+        return "\n".join(lines)
+
+    def _approve_memory(self, text):
+        rest = text[len("approve memory"):].strip()
+        if not rest or not rest.isdigit():
+            return "Dùng: approve memory <id>"
+        ok = self.mem.approve_candidate(int(rest))
+        return "✅ Đã duyệt." if ok else "❌ Không tìm thấy id."
+
+    def _reject_memory(self, text):
+        rest = text[len("reject memory"):].strip()
+        if not rest or not rest.isdigit():
+            return "Dùng: reject memory <id>"
+        ok = self.mem.reject_candidate(int(rest))
+        return "🗑️ Đã từ chối." if ok else "❌ Không tìm thấy id."
+
+    def _growth_status(self):
+        st = self.mem.stats()
+        try:
+            from runtime_profile import governor_status
+            rt = governor_status(self.profile_name, self.brain.model if self.brain.backend != "micro" else "micro-template", self.brain.backend)
+        except Exception:
+            rt = {"profile": self.profile_name, "mode": "chat", "degraded_reason": None}
+        lines = [
+            "📊 Growth status:",
+            f"  profile={rt.get('profile')} mode={rt.get('mode')} degraded={rt.get('degraded_reason')}",
+            f"  candidates pending={st.get('candidates_pending')} trusted={st.get('candidates_trusted')}",
+            f"  idle_study enabled={bool(getattr(self, 'idle_study', False))} allow_network={bool(getattr(self, 'allow_network', False))}",
+        ]
+        return "\n".join(lines)
+
+    def _growth_report(self):
+        try:
+            from pathlib import Path
+            rpt = sorted((Path(__file__).resolve().parent / "data" / "growth_reports").glob("idle_study_*.json"))[-1]
+            data = json.loads(rpt.read_text(encoding="utf-8"))
+            return json.dumps({
+                "profile": data.get("profile"),
+                "mode": data.get("mode"),
+                "degraded_reason": data.get("degraded_reason"),
+                "used_session_minutes": data.get("used_session_minutes"),
+                "topics": [t.get("topic") for t in data.get("topics", [])],
+                "facts_candidate_count": len(data.get("facts_candidate", [])),
+            }, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"❌ Không đọc được report: {e}"

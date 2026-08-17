@@ -237,9 +237,9 @@ python main.py [options]
 | Rất yếu (4GB RAM, CPU 2 nhân cũ) | micro hoặc qwen2.5:0.5b | 50MB / ~500MB | CLI |
 | Văn phòng thường (6-8GB RAM, i3/i5) | qwen2.5:1.5b | ~1GB | CLI / Web |
 | Khỏe (8-16GB RAM, i7/Ryzen 5+) | qwen2.5:3b | ~2.5GB | CLI / Web / Voice |
-| Có GPU NVIDIA/AMD | qwen2.5:7b hoặc lớn hơn | tùy model | Web + Voice |
+| Radeon 760M iGPU | CPU-first là fallback hợp lệ; GPU acceleration chỉ best-effort, không đổi policy mặc định |
 
-Ollama tự động dùng GPU nếu nhận được card đồ họa tương thích.
+> Lưu ý quan trọng: `python main.py` giờ **không tự bật** `auto-learn`/`self-improve` nữa. Muốn dùng hãy thêm flag rõ ràng.
 
 ---
 
@@ -263,6 +263,16 @@ Code chỉ vài trăm dòng mỗi file, dễ đọc dễ sửa. Các ý tưởng
 - [x] Thêm **planning dài hạn** (mục tiêu nhiều bước, theo dõi tiến độ)
 - [x] Tích hợp **vision** (mô hình Moondream hoặc LLaVA qua Ollama) để CLARA nhìn ảnh/màn hình
 - [x] **Self-modification có kiểm soát** — CLARA đề xuất thay đổi code của chính nó và yêu cầu bạn duyệt trước khi áp dụng
+
+## 📝 Changelog v1.5
+
+- **Safe defaults**: tắt `self-improve`/`auto-learn` mặc định; không chạy network/web research nếu user không bật.
+- **Runtime profile**: thêm `mobile_12gb_safe`, `eco`, `custom` qua `--profile`; hiển thị profile, mode, degraded reason, RAM available trong `status`.
+- **Resource governor**: đọc `/proc` và `/sys/class/power_supply`; dừng/delay idle-study khi RAM thấp, swap cao, hoặc đang dùng pin.
+- **Bounded idle-study**: thêm `--idle-study` opt-in, giới hạn thời gian/topics/facts; không tự đổi code/skill, chỉ ghi report vào `data/growth_reports`.
+- **Model routing without silent fallback**: ghi rõ backend/model đang dùng; cảnh báo micro fallback rõ lý do.
+- **Benchmark-only mode**: `--benchmark-model <installed-model>` chạy 3 prompt ngắn, ghi report vào `data/benchmarks`, không tải model.
+- **Evaluation**: bộ test offline kiểm tra governor, degraded mode, bounded idle-study, CLI flags, brain routing.
 
 ## 📝 Changelog v1.4
 

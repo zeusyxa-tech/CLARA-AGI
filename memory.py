@@ -100,10 +100,21 @@ class Memory:
             vector TEXT,
             ts REAL
         );
+        CREATE TABLE IF NOT EXISTS candidate_memory(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic TEXT,
+            fact TEXT,
+            confidence REAL DEFAULT 0.5,
+            source TEXT DEFAULT 'candidate',
+            captured_at REAL,
+            status TEXT DEFAULT 'pending',
+            reason TEXT
+        );
         CREATE INDEX IF NOT EXISTS ep_ts ON episodes(ts);
         CREATE INDEX IF NOT EXISTS ep_kind ON episodes(kind);
         CREATE INDEX IF NOT EXISTS sem_topic ON semantics(topic);
         CREATE INDEX IF NOT EXISTS goals_status ON goals(status);
+        CREATE INDEX IF NOT EXISTS cand_status ON candidate_memory(status);
         """
         self.conn.executescript(ddl)
         try:
@@ -413,7 +424,7 @@ class Memory:
     # ---------------- STATS / EXPORT ----------------
     def stats(self):
         c = self.conn.cursor()
-        return {
+        out = {
             "episodes": c.execute("SELECT COUNT(*) FROM episodes").fetchone()[0],
             "semantics": c.execute("SELECT COUNT(*) FROM semantics").fetchone()[0],
             "procedures": c.execute("SELECT COUNT(*) FROM procedures").fetchone()[0],
@@ -422,7 +433,10 @@ class Memory:
             "done_goals": c.execute("SELECT COUNT(*) FROM goals WHERE status='done'").fetchone()[0],
             "dreams": c.execute("SELECT COUNT(*) FROM dreams").fetchone()[0],
             "user_model_entries": c.execute("SELECT COUNT(*) FROM user_model").fetchone()[0],
+            "candidates_pending": c.execute("SELECT COUNT(*) FROM candidate_memory WHERE status='pending'").fetchone()[0],
+            "candidates_trusted": c.execute("SELECT COUNT(*) FROM candidate_memory WHERE status='trusted'").fetchone()[0],
         }
+        return out
 
     def export_knowledge(self, path):
         out = {
@@ -431,10 +445,48 @@ class Memory:
             "goals": [dict(r) for r in self.conn.execute("SELECT * FROM goals").fetchall()],
             "user_model": self.all_user(),
             "traits": {k: self.get_trait(k) for k in [r[0] for r in self.conn.execute("SELECT k FROM traits").fetchall()]},
+            "candidate_memory": [dict(r) for r in self.conn.execute("SELECT * FROM candidate_memory").fetchall()],
             "exported_at": now(),
         }
         Path(path).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
         return out
+
+    # ---------------- CANDIDATE MEMORY ----------------
+    def add_candidate(self, topic, fact, source="candidate", confidence=0.5, reason="idle candidate"):
+        self.conn.execute(
+            "INSERT INTO candidate_memory(topic,fact,confidence,source,captured_at,status,reason) VALUES(?,?,?,?,?,?,?)",
+            (topic, fact, confidence, source, now(), "pending", reason),
+        )
+        self.conn.commit()
+
+    def review_candidates(self, limit=20):
+        rows = [dict(r) for r in self.conn.execute(
+            "SELECT * FROM candidate_memory WHERE status='pending' ORDER BY captured_at DESC LIMIT ?", (limit,)
+        )]
+        return rows
+
+    def approve_candidate(self, cid):
+        r = self.conn.execute("SELECT * FROM candidate_memory WHERE id=?", (cid,)).fetchone()
+        if not r:
+            return None
+        fact = r["fact"]
+        old = self.conn.execute("SELECT id, confidence FROM semantics WHERE fact=?", (fact,)).fetchone()
+        if old:
+            self.conn.execute("UPDATE semantics SET confidence=min(1.0, confidence+0.05), last_access=? WHERE id=?", (now(), old["id"]))
+        else:
+            self.conn.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source) VALUES(?,?,?,?,?,?)",
+                               (now(), r["topic"], fact, min(1.0, (r.get("confidence") or 0.5) + 0.1), now(), "user_approved"))
+        self.conn.execute("UPDATE candidate_memory SET status='trusted', reason='approved' WHERE id=?", (cid,))
+        self.conn.commit()
+        return True
+
+    def reject_candidate(self, cid):
+        r = self.conn.execute("SELECT * FROM candidate_memory WHERE id=?", (cid,)).fetchone()
+        if not r:
+            return None
+        self.conn.execute("UPDATE candidate_memory SET status='rejected', reason='rejected_by_user' WHERE id=?", (cid,))
+        self.conn.commit()
+        return True
 
     # ---------------- UTIL ----------------
     def _normalize(self, s: str) -> str:

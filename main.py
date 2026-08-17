@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-CLARA-AGI v1.1 — CLI launcher.
-Chạy: python3 main.py [--micro] [--model <name>] [--web] [--voice] [--auto-learn]
+CLARA-AGI v1.5 — CLI launcher.
+Chạy: python3 main.py [--micro] [--model <name>] [--web] [--voice] [--auto-learn] [--idle-study] [--allow-network] [--profile eco|mobile_12gb_safe|custom]
 """
 import argparse, sys, os, json, time, random, threading, re
 from pathlib import Path
@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 WELCOME = """
 ╔═══════════════════════════════════════════════════════════════╗
-║   🧬  CLARA-AGI  v1.4  —  Tác nhân tự chủ kiểu AGI          ║
-║     local-first · chạy CPU · tự học · tự phản tỉnh          ║
+║   🧬  CLARA-AGI  v1.5  —  bounded continual-learning local agent      ║
+║     local-first · CPU-first · governed learning · safe defaults       ║
 ╚═══════════════════════════════════════════════════════════════╝
 """
 
@@ -19,7 +19,14 @@ WELCOME = """
 def print_status(agi):
     s = agi.status()
     print(f"   🧠 Brain     : {s['brain']['backend']} — {s['brain']['model']}")
-    print(f"   💾 Memory    : {s['memory']['episodes']} episodes · "
+    print(f"   🖥 Profile   : {s.get('runtime', {}).get('profile', '?')} | mode={s.get('runtime', {}).get('mode', '?')}")
+    rt = s.get("runtime", {})
+    if rt.get("degraded_reason"):
+        print(f"   ⚠️  Degraded : {rt['degraded_reason']}")
+    hw = rt.get("hardware", {})
+    if hw.get("ram_available_bytes") is not None:
+        print(f"   💾 RAM avail : {hw['ram_available_bytes']/1024/1024:.1f} MiB")
+    print(f"   📚 Memory    : {s['memory']['episodes']} episodes · "
           f"{s['memory']['semantics']} facts · "
           f"{s['memory']['procedures']} procedures (auto: {s['memory']['auto_procedures']})")
     print(f"   🎯 Goals     : {s['memory']['active_goals']} active / {s['memory']['done_goals']} done")
@@ -43,7 +50,8 @@ def print_status(agi):
 def run_cli(args):
     from agent import ClarasAGI
     agi = ClarasAGI(force_micro=args.micro, model=args.model,
-                    dream_every=args.dream_every, auto_skill=not args.no_auto_skill)
+                    dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network)
     print(WELCOME)
     print_status(agi)
 
@@ -256,12 +264,12 @@ def main():
     ap.add_argument("--dream-every", type=int, default=10,
                     help="Số lượt nói rồi tôi tự 'ngủ mơ' tổng hợp (0=tắt)")
     ap.add_argument("--no-auto-skill", action="store_true", help="Tắt tự tạo skill mới")
-    ap.add_argument("--auto-learn", action="store_true", default=True,
-                    help="BẬT chế độ tự học khi rảnh (mặc định bật; dùng --no-auto-learn để tắt)")
+    ap.add_argument("--auto-learn", action="store_true", default=False,
+                    help="BẬT chế độ tự học khi rảnh (mặc định tắt; dùng --auto-learn để bật)")
     ap.add_argument("--no-auto-learn", action="store_false", dest="auto_learn",
                     help="Tắt tự học nền khi khởi động")
-    ap.add_argument("--self-improve", action="store_true", default=True,
-                    help="BẬT chế độ TỰ NÂNG CẤP (mặc định bật; dùng --no-self-improve để tắt)")
+    ap.add_argument("--self-improve", action="store_true", default=False,
+                    help="BẬT chế độ TỰ NÂNG CẤP (mặc định tắt; chỉ bật khi cần)")
     ap.add_argument("--no-self-improve", action="store_false", dest="self_improve",
                     help="Tắt tự nghiên cứu web khi khởi động")
     ap.add_argument("--research-interval", type=int, default=300,
@@ -269,7 +277,21 @@ def main():
     ap.add_argument("--idle-interval", type=int, default=25,
                     help="Số giây giữa mỗi bước tự học (mặc định 25). Tăng lên nếu thấy CPU nóng.")
     ap.add_argument("--quiet", action="store_true", help="Bớt log tự học")
+    ap.add_argument("--profile", type=str, default="mobile_12gb_safe", help="Runtime profile: eco|mobile_12gb_safe|custom")
+    ap.add_argument("--idle-study", action="store_true", help="Bật bounded idle-study opt-in")
+    ap.add_argument("--allow-network", action="store_true", help="Cho phép network trong idle-study (mặc định tắt)")
+    ap.add_argument("--benchmark-model", type=str, default=None, help="Benchmark exact installed model; no download")
+    ap.add_argument("--benchmark-provider", type=str, default="ollama", help="Backend for benchmark")
     args = ap.parse_args()
+
+    if args.benchmark_model:
+        try:
+            from benchmark import run_benchmark
+            report = run_benchmark(args.benchmark_model, backend=args.benchmark_provider)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        except Exception as e:
+            print(f"❌ Benchmark failed: {e}")
+        sys.exit(0)
 
     if args.web:
         run_web(args)
