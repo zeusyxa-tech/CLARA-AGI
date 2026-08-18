@@ -3,7 +3,7 @@ CLARA-AGI Voice mode — nói vào micro, nghe CLARA đáp lại qua loa.
 PHỤ THUỘC TÙY CHỌN (không cài thì CLARA vẫn chạy CLI/Web bình thường):
   pip install openai-whisper piper-tts sounddevice soundfile numpy pyaudio
 
-Nếu không cù đủ thư viện, bạn có thể dùng chế độ fallback:
+Nếu không đủ thư viện, bạn có thể dùng chế độ fallback:
   - STT fallback: dùng SpeechRecognition + Google (online, free, nhẹ)
   - TTS fallback: dùng pyttsx3 (offline, giọng máy mặc định)
 """

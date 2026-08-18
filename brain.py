@@ -39,12 +39,15 @@ def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, n
     return (j.get("response") or "").strip()
 
 
-def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400):
-    data = json.dumps({
+def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400, options=None):
+    payload = {
         "model": model, "messages": messages, "stream": False,
-        "options": {"temperature": temperature, "num_predict": num_predict,
-                    "top_p": 0.9, "seed": -1}
-    }).encode()
+        "options": options or {"temperature": temperature, "num_predict": num_predict,
+                               "top_p": 0.9, "seed": -1}
+    }
+    if "temperature" not in (payload.get("options") or {}):
+        (payload.get("options") or {})["temperature"] = temperature
+    data = json.dumps(payload).encode()
     req = urllib.request.Request(f"{url}/api/chat", data=data,
                                  headers={"Content-Type": "application/json"})
     resp = urllib.request.urlopen(req, timeout=120)
@@ -388,13 +391,14 @@ class MicroLLM:
 
 # ---------------- BRAIN CHUNG ----------------
 class Brain:
-    def __init__(self, force_micro=False, model=None, language=None):
+    def __init__(self, force_micro=False, model=None, language=None, profile=None):
         self.models = ollama_list()
         self.backend = "micro"
         self.model = model or DEFAULT_OLLAMA
         self.micro = MicroLLM()
         self.temperature = 0.5
         self.language = normalize_language(language or os.environ.get("CLARA_LANGUAGE"), default="vi")
+        self.profile = profile or os.environ.get("CLARA_PROFILE", "mobile_12gb_safe")
         if not force_micro and self.models is not None:
             names = [m.get("name","") for m in self.models]
             for cand in [self.model] + CANDIDATE_MODELS:
@@ -402,6 +406,24 @@ class Brain:
                     self.model = cand
                     self.backend = "ollama"
                     break
+
+    def _ollama_options(self, temperature=None, num_predict=None):
+        try:
+            from runtime_profile import choose_profile
+            p = choose_profile(self.profile)
+            return {
+                "temperature": temperature if temperature is not None else self.temperature,
+                "num_predict": num_predict or p.completion_default,
+                "top_p": 0.9,
+                "seed": -1,
+            }
+        except Exception:
+            return {
+                "temperature": temperature if temperature is not None else self.temperature,
+                "num_predict": num_predict or 384,
+                "top_p": 0.9,
+                "seed": -1,
+            }
 
     def think(self, tag, prompt, **kw):
         t = kw.get("temperature", self.temperature)
@@ -412,6 +434,10 @@ class Brain:
                 {"role": "user", "content": prompt},
             ]
             try:
+                out = ollama_chat_messages(messages, model=self.model, temperature=t,
+                                           num_predict=kw.get("num_predict", 400),
+                                           options=self._ollama_options(t, kw.get("num_predict", 400))) or ""
+            except TypeError:
                 out = ollama_chat_messages(messages, model=self.model, temperature=t,
                                            num_predict=kw.get("num_predict", 400)) or ""
             except Exception:

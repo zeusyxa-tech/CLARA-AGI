@@ -24,7 +24,8 @@ class ClarasAGI:
                  profile="mobile_12gb_safe", idle_study=False, allow_network=False,
                  language=None):
         self.mem = Memory()
-        self.brain = Brain(force_micro=force_micro, model=model, language=language)
+        self.brain = Brain(force_micro=force_micro, model=model, language=language,
+                           profile=profile)
         self.wm = []
         self.dream_every = dream_every
         self.auto_skill = auto_skill

@@ -47,24 +47,24 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:8px}
 </style></head><body>
 <header>
   <div class="dot" id="dot"></div>
-  <strong>🧬 CLARA-AGI v1.1</strong>
+  <strong>🧬 CLARA-AGI</strong>
   <span class="status" id="status">đang tải…</span>
 </header>
 <main>
   <div class="tools">
-    <span class="chip" onclick="send('commands')">/commands</span>
-    <span class="chip" onclick="send('status')">/status</span>
-    <span class="chip" onclick="send('dream')">/dream</span>
+    <span class="chip" onclick="send('commands')">/lệnh</span>
+    <span class="chip" onclick="send('status')">/trạng-thái</span>
+    <span class="chip" onclick="send('dream')">/ngủ-mơ</span>
     <span class="chip" onclick="send('bạn là ai')">bạn là ai?</span>
     <span class="chip" onclick="send('tính 15!')">tính 15!</span>
   </div>
   <div id="chat"></div>
   <form onsubmit="submitMsg(event)">
-    <textarea id="inp" placeholder="Nói gì đó với CLARA... (Enter gửi, Shift+Enter xuống dòng)" autofocus></textarea>
+    <textarea id="inp" placeholder="Nhắn gì đó với CLARA... (Enter gửi, Shift+Enter xuống dòng)" autofocus></textarea>
     <button id="btn">Gửi</button>
   </form>
 </main>
-<footer>Local-only · không gửi dữ liệu đi đâu · 100% chạy trên máy bạn</footer>
+<footer>Chỉ chạy nội bộ · không gửi dữ liệu ra ngoài · 100% trên máy bạn</footer>
 <script>
 const chat=document.getElementById('chat');
 const inp=document.getElementById('inp');
@@ -107,7 +107,7 @@ async function refreshStatus(){
 function updateStatus(s){
   if(!s)return;
   const m=s.memory||{};
-  stat.textContent=`🧠 ${s.brain?.backend||''} · 💾 ${m.episodes||0}ep / ${m.semantics||0}facts / ${m.procedures||0}procs · ${s.turns||0} turns · ${s.age_hours||0}h`;
+  stat.textContent=`🧠 ${s.brain?.backend||''} · 💾 ${m.episodes||0}ep / ${m.semantics||0}facts / ${m.procedures||0}procs · ${s.turns||0} lượt · ${s.age_hours||0}h`;
 }
 inp.addEventListener('keydown',e=>{
   if(e.key==='Enter' && !e.shiftKey){e.preventDefault();submitMsg(e)}

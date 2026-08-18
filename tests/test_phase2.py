@@ -402,6 +402,70 @@ class TestLocaleDefaults:
         assert row["fact"] == "Hà Nội đẹp."
         assert row["language"] == "vi"
 
+    def test_web_run_propagates_profile_and_language(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLARA_DB_PATH", str(tmp_path / "clara.db"))
+        monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
+        import main as main_module
+        captured = {}
+
+        class DummyArgs:
+            micro = True
+            model = None
+            dream_every = 10
+            no_auto_skill = False
+            auto_learn = False
+            idle_interval = 25
+            self_improve = False
+            research_interval = 300
+            quiet = False
+            profile = "eco"
+            idle_study = True
+            allow_network = True
+            language = "en"
+            host = "127.0.0.1"
+            port = 5000
+
+        def fake_create_app(agi):
+            captured["web"] = {
+                "language": getattr(agi, "language", None),
+                "profile": getattr(agi, "profile_name", None),
+                "allow_network": getattr(agi, "allow_network", None),
+                "idle_study": getattr(agi, "idle_study", None),
+                "brain_profile": getattr(getattr(agi, "brain", None), "profile", None),
+            }
+            class DummyApp:
+                def run(self, *a, **kwargs):
+                    raise SystemExit(0)
+            return DummyApp()
+
+        try:
+            import webui
+            webui.create_app = fake_create_app
+        except Exception:
+            import types
+            fake_webui = types.ModuleType("webui")
+            fake_webui.create_app = fake_create_app
+            main_module.sys.modules["webui"] = fake_webui
+
+        try:
+            main_module.run_web(DummyArgs())
+        except SystemExit:
+            pass
+        finally:
+            try:
+                import webui
+                import importlib
+                importlib.reload(webui)
+            except Exception:
+                pass
+
+        web = captured.get("web", {})
+        assert web.get("language") == "en"
+        assert web.get("profile") == "eco"
+        assert web.get("allow_network") is True
+        assert web.get("idle_study") is True
+        assert web.get("brain_profile") == "eco"
+
 
 class _FakeOllamaServer:
     def __init__(self):
