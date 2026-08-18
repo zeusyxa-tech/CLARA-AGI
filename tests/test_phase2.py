@@ -250,6 +250,15 @@ class TestLocaleDefaults:
         b = Brain(force_micro=True)
         assert b.language == "en"
 
+    def test_clara_language_env_overrides_none(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLARA_DB_PATH", str(tmp_path / "clara.db"))
+        monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
+        monkeypatch.setenv("CLARA_LANGUAGE", "en")
+        from agent import ClarasAGI
+        agi = ClarasAGI(force_micro=True, language=None)
+        assert agi.language == "en"
+        assert agi.brain.language == "en"
+
     def test_user_message_not_lost_on_overflow(self, tmp_path, monkeypatch):
         monkeypatch.setenv("CLARA_DB_PATH", str(tmp_path / "clara.db"))
         monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
@@ -306,6 +315,14 @@ class TestLocaleDefaults:
         agi = ClarasAGI(force_micro=True)
         study = getattr(agi, "_study", None)
         assert study is None or getattr(study, "_running", False) is False
+
+    def test_idle_study_does_not_start_legacy_scheduler(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLARA_DB_PATH", str(tmp_path / "clara.db"))
+        monkeypatch.setenv("CLARA_OLLAMA_URL", "http://127.0.0.1:11434")
+        from agent import ClarasAGI
+        agi = ClarasAGI(force_micro=True, idle_study=True)
+        assert getattr(agi, "idle_study", False) is True
+        assert getattr(agi, "_study", None) is None
 
     def test_web_tools_gated_by_allow_network(self, monkeypatch):
         import web_tools

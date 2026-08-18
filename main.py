@@ -219,7 +219,9 @@ def run_web(args):
     from agent import ClarasAGI
     from autolearn import AutoLearner
     agi = ClarasAGI(force_micro=args.micro, model=args.model,
-                    dream_every=args.dream_every, auto_skill=not args.no_auto_skill)
+                    dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                    language=args.language or os.environ.get("CLARA_LANGUAGE"))
     auto = None
     if args.auto_learn:
         auto = AutoLearner(agi, interval=args.idle_interval, verbose=False)
@@ -246,7 +248,9 @@ def run_voice(args):
         print("   Cần: pip install SpeechRecognition pyttsx3 pyaudio")
         sys.exit(1)
     from agent import ClarasAGI
-    agi = ClarasAGI(force_micro=args.micro, model=args.model)
+    agi = ClarasAGI(force_micro=args.micro, model=args.model,
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                    language=args.language or os.environ.get("CLARA_LANGUAGE"))
     v = VoiceCLARA(agi)
     print(WELCOME)
     print("🎙️ Chế độ giọng nói đã sẵn sàng. Nhấn Enter để nói, hoặc Ctrl+C để dừng.")

@@ -24,7 +24,7 @@ class ClarasAGI:
                  profile="mobile_12gb_safe", idle_study=False, allow_network=False,
                  language=None):
         self.mem = Memory()
-        self.brain = Brain(force_micro=force_micro, model=model, language=language or "vi")
+        self.brain = Brain(force_micro=force_micro, model=model, language=language)
         self.wm = []
         self.dream_every = dream_every
         self.auto_skill = auto_skill
@@ -49,12 +49,6 @@ class ClarasAGI:
         self.allow_network = allow_network
         if _HAS_SCHEDULER:
             attach_study_commands(self)
-            self._study = StudyScheduler(self, enabled=False, interval=120)
-            try:
-                if getattr(self, "idle_study", False):
-                    self._study.start()
-            except Exception:
-                pass
 
     # ------------------ CORE CYCLE ------------------
     def chat(self, user_text: str) -> str:
@@ -383,7 +377,7 @@ class ClarasAGI:
     def _status_text(self):
         s = self.brain.status()
         st = None
-        if _HAS_SCHEDULER and hasattr(self, "_study"):
+        if _HAS_SCHEDULER and self._study is not None:
             st = self._study.status()
         out = [
             "🧠 Brain     : " + s["backend"] + " — " + s["model"],
@@ -419,18 +413,14 @@ class ClarasAGI:
             "  income_focus <set_path|add_target|log|block_path|status>|<args>\n"
             "  income_opportunity_finder <query>   quét cơ hội thu nhập phù hợp\n"
             "  income_portfolio <add_platform|add_project|add_proposal|add_bounty|status|export>|<args>\n"
+            "  idle-study         chạy 1 phiên bounded idle-study (one-shot)\n"
+            "  study plan         xem kế hoạch (legacy)\n"
+            "  study status       tiến độ / streak (legacy)\n"
+            "  study review today ôn tập hôm nay (legacy)\n"
+            "  study weekly       tổng kết cuối tuần (legacy)\n"
             "  quit              thoát\n"
             "Công cụ tôi tự dùng khi cần: calc, now, read, write, list, run_python, search"
         )
-        if _HAS_SCHEDULER:
-            base += (
-                "\n\n📚 Học theo lịch:\n"
-                "  study plan                 xem kế hoạch\n"
-                "  study plan add <chủ đề>    thêm chủ đề học\n"
-                "  study status               tiến độ / streak\n"
-                "  study review today         ôn tập hôm nay\n"
-                "  study weekly               tổng kết cuối tuần"
-            )
         if _HAS_SELF_PATCHER:
             base += (
                 "\n\n🔧 Tự nâng cấp:\n"
