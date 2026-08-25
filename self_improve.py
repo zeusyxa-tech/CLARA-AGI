@@ -1,13 +1,13 @@
 """
 CLARA-AGI v1.3 - Self-Improvement: web research, skill proposal, auto-approval.
 """
-import os, re, json, time
+import ast, os, re, json, time
 from pathlib import Path
 from web_tools import web_search, web_fetch
 
 CUSTOM_SKILLS_DIR = Path(__file__).parent / "skills_custom"
 CUSTOM_SKILLS_DIR.mkdir(exist_ok=True)
-ACTIVE_DIR = CUSTOM_SKILLS_DIR / "active"
+ACTIVE_DIR = CUSTOM_SKILLS_DIR / "_quarantine"
 ACTIVE_DIR.mkdir(exist_ok=True)
 PENDING_DIR = CUSTOM_SKILLS_DIR / "_pending"
 PENDING_DIR.mkdir(exist_ok=True)
@@ -15,6 +15,7 @@ PENDING_DIR.mkdir(exist_ok=True)
 MAX_PAGES_DEFAULT = 3
 MAX_FACTS_PER_PAGE = 5
 MIN_CONFIDENCE = 0.5
+WEB_CONFIDENCE_CAP = 0.5
 DEDUP_SIMILARITY_THRESHOLD = 0.85
 
 
@@ -94,7 +95,8 @@ def research(agi, topic: str, max_pages: int = MAX_PAGES_DEFAULT) -> str:
 
     for fact_text, url in deduped:
         if len(fact_text) > 15 and url:
-            agi.mem.learn(f"web:{_normalize(topic)[:25]}", fact_text, confidence=MIN_CONFIDENCE, source=f"web:{url}")
+            confidence = min(WEB_CONFIDENCE_CAP, MIN_CONFIDENCE)
+            agi.mem.learn(f"web:{_normalize(topic)[:25]}", fact_text, confidence=confidence, source=f"web:{url}")
             learned += 1
 
     agi.mem.remember_episode("research",
@@ -126,8 +128,25 @@ BLOCKED_PATTERNS = [
 
 
 def _safe_code(code: str) -> bool:
-    c = code.lower()
-    return not any(p in c for p in BLOCKED_PATTERNS)
+    try:
+        tree = ast.parse(code)
+    except Exception:
+        return False
+    ALLOW_IMPORTS = {"math", "json", "re", "datetime", "collections", "itertools", "functools", "statistics", "string", "time"}
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.Import, ast.ImportFrom)):
+            mod = getattr(n, "module", None) or ""
+            top = mod.split(".")[0] if mod else ""
+            names = [getattr(alias, "name", "").split(".")[0] for alias in getattr(n, "names", [])]
+            if top and top not in ALLOW_IMPORTS:
+                return False
+            if any(name and name not in ALLOW_IMPORTS for name in names):
+                return False
+        if isinstance(n, ast.Attribute) and n.attr.startswith("__"):
+            return False
+        if isinstance(n, ast.Name) and n.id in {"eval", "exec", "compile", "open", "os", "sys", "subprocess", "socket", "urllib", "importlib", "shutil", "pickle", "globals", "locals", "getattr", "setattr", "vars", "input", "__import__"}:
+            return False
+    return True
 
 
 def propose_skill(agi, topic_or_problem: str) -> dict:
@@ -300,9 +319,9 @@ def _register_custom_tool(agi, name, module):
     tool_name = f"custom_{name}"
     if tool_name in TOOLS:
         return
-    def _fn(arg):
+    def _fn(agent, arg):
         try:
-            return module.run(agi, arg)
+            return module.run(agent, arg)
         except Exception as e:
             return f"❌ Lỗi skill {name}: {e}"
     TOOLS[tool_name] = {"fn": _fn, "needs_agent": True, "desc": f"Skill tự tạo: {name}"}

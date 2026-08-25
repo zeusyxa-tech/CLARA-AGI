@@ -206,11 +206,22 @@ Khi phát hiện lỗi lặp lại, CLARA **tự tạo ra thủ tục mới** v�
 
 ## 🛡️ Về an toàn & riêng tư
 
-- **100% local** — không gửi dữ liệu của bạn đi đâu cả
-- File có `run_python` chạy code trong **sandbox** (chặn `open`, `eval`, `exec`, `import` bừa, timeout 8s, chạy process con)
+- **Mặc định chạy hoàn toàn local** — không gửi dữ liệu của bạn đi đâu cả
+- Các chế độ tự học nền, tự nghiên cứu web, nạp skill là **tùy chọn** (flag `--auto-learn` / `--self-improve` / `--load-skills`) và có truy cập internet.
+- File `run_python` chạy code trong **sandbox** (chặn `open`, `eval`, `exec`, `import` bừa, timeout 8s, chạy process con) — **mặc định tắt**, bật bằng `--dangerous-python`
 - Đọc/ghi file chỉ được trong thư mục `workspace/` (không thể đụng file hệ thống)
 - Mọi trí nhớ lưu trong `data/clara.db` (SQLite), bạn có thể xóa bất cứ lúc nào để CLARA "sinh ra lại từ đầu"
 - Không có telemetry, không có kết nối ngầm
+
+### Bảng flag an toàn
+
+| Flag | Mặc định | Tác dụng |
+|---|---|---|
+| `--dangerous-python` | tắt | Bật tool `run_python` trong sandbox |
+| `--auto-learn` | tắt | Tự học nền khi rảnh |
+| `--self-improve` | tắt | Tự nghiên cứu web + đề xuất skill |
+| `--load-skills` | tắt | Nạp skill từ `skills_custom/_quarantine` (cần review) |
+| `--allow-network` | tắt | Cho phép tool web (`web_fetch`, `search`) hoạt động |
 
 ---
 
@@ -226,6 +237,11 @@ python main.py [options]
   --port 5000        Bind port cho web
   --dream-every N    Tự ngủ mơ sau N lượt (mặc định 10, 0=tắt)
   --no-auto-skill    Tắt tự tạo skill mới
+  --dangerous-python Bật tool run_python trong sandbox (mặc định tắt)
+  --auto-learn       Tự học nền khi rảnh (mặc định tắt)
+  --self-improve     Tự nghiên cứu web + đề xuất skill (mặc định tắt)
+  --load-skills      Nạp skill từ skills_custom/_quarantine (mặc định tắt)
+  --allow-network    Cho phép tool web hoạt động (mặc định tắt)
 ```
 
 ---
@@ -289,7 +305,7 @@ Code chỉ vài trăm dòng mỗi file, dễ đọc dễ sửa. Các ý tưởng
 ## ❓ Hỏi đáp nhanh
 
 **Q: Chạy không cần internet?**  
-A: Có. Chỉ cần internet khi bạn pull model Ollama lần đầu, sau đó mọi thứ hoàn toàn offline.
+A: Có — mặc định CLARA chạy hoàn toàn local, không cần mạng. Chỉ cần internet khi bạn bật `--self-improve`/`--load-skills`/`--allow-network` hoặc pull model Ollama lần đầu.
 
 **Q: Nếu tôi tắt máy, CLARA có nhớ tôi không?**  
 A: Có. Tất cả lưu trong `data/clara.db`. Mở lại nó nhớ hết.

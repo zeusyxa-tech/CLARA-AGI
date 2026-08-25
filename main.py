@@ -8,9 +8,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-WELCOME = """
+from version import __version__
+
+WELCOME = f"""
 ╔═══════════════════════════════════════════════════════════════╗
-║   🧬  CLARA-AGI  v1.5  —  bounded continual-learning local agent      ║
+║   🧬  CLARA-AGI  v{__version__}  —  bounded continual-learning local agent      ║
 ║     local-first · CPU-first · governed learning · safe defaults       ║
 ╚═══════════════════════════════════════════════════════════════╝
 """
@@ -51,6 +53,8 @@ def run_cli(args):
     from agent import ClarasAGI
     from web_tools import allow_network as _allow_network
     _allow_network(args.allow_network)
+    import tools as _tools
+    _tools._set_dangerous_python(args.dangerous_python)
     agi = ClarasAGI(force_micro=args.micro, model=args.model,
                     dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
                     profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
@@ -69,6 +73,14 @@ def run_cli(args):
 
     # Self-improve (tự lên mạng học code, đề xuất skill mới)
     improver = None
+    if args.load_skills:
+        from self_improve import load_custom_skills as _load_custom_skills
+        print("⚠️ Đang nạp skill chưa audit — chỉ dùng trên môi trường test")
+        _loaded = _load_custom_skills(agi)
+        if _loaded:
+            print(f"🛠️ Đã nạp {len(_loaded)} skill đã audit: {', '.join(_loaded)}")
+        else:
+            print("ℹ️ Không có skill nào được nạp.")
     if args.self_improve:
         from self_improve import improve, list_pending, approve_skill, reject_skill, load_custom_skills, research
         loaded = load_custom_skills(agi)
@@ -261,7 +273,7 @@ def run_voice(args):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="CLARA-AGI v1.1")
+    ap = argparse.ArgumentParser(description=f"CLARA-AGI v{__version__}")
     ap.add_argument("--micro", action="store_true", help="Bắt buộc dùng micro brain (không Ollama)")
     ap.add_argument("--model", type=str, default=None, help="Model Ollama (vd qwen2.5:0.5b)")
     ap.add_argument("--web", action="store_true", help="Mở giao diện web")
@@ -271,6 +283,7 @@ def main():
     ap.add_argument("--dream-every", type=int, default=10,
                     help="Số lượt nói rồi tôi tự 'ngủ mơ' tổng hợp (0=tắt)")
     ap.add_argument("--no-auto-skill", action="store_true", help="Tắt tự tạo skill mới")
+    ap.add_argument("--dangerous-python", action="store_true", help="BẬT tool run_python trong sandbox (mặc định tắt)")
     ap.add_argument("--auto-learn", action="store_true", default=False,
                     help="BẬT chế độ tự học khi rảnh (mặc định tắt; dùng --auto-learn để bật)")
     ap.add_argument("--no-auto-learn", action="store_false", dest="auto_learn",
@@ -287,14 +300,15 @@ def main():
     ap.add_argument("--profile", type=str, default="mobile_12gb_safe", help="Runtime profile: eco|mobile_12gb_safe|custom")
     ap.add_argument("--idle-study", action="store_true", help="Bật bounded idle-study opt-in")
     ap.add_argument("--allow-network", action="store_true", help="Cho phép network trong idle-study (mặc định tắt)")
-    ap.add_argument("--benchmark-model", type=str, default=None, help="Benchmark exact installed model; no download")
+    ap.add_argument("--load-skills", action="store_true", default=False,
+                    help="Nạp skill đã audit từ skills_custom/_quarantine (mặc định tắt)")
     ap.add_argument("--benchmark-provider", type=str, default="ollama", help="Backend for benchmark")
     ap.add_argument("--language", type=str, default=None, help="Ngôn ngữ ưu tiên: vi|en|auto")
     args = ap.parse_args()
     raw_lang = args.language or os.environ.get("CLARA_LANGUAGE") or "vi"
     args.language = raw_lang
 
-    if args.benchmark_model:
+    if getattr(args, "benchmark_model", None):
         try:
             from benchmark import run_benchmark
             report = run_benchmark(args.benchmark_model, backend=args.benchmark_provider)

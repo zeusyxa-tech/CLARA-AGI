@@ -5,6 +5,11 @@ Không cần thư viện ngoài — dùng sqlite3 (Python mặc định).
 import sqlite3, time, json, math, hashlib, os, unicodedata, re
 from pathlib import Path
 
+try:
+    from version import __version__ as _VERSION
+except Exception:
+    _VERSION = "1.4"
+
 DB_DIR = Path(os.environ.get("CLARA_DB_DIR", "")) if os.environ.get("CLARA_DB_DIR") else Path(__file__).parent / "data"
 DB_DIR.mkdir(exist_ok=True)
 DB_PATH = Path(os.environ.get("CLARA_DB_PATH", "")) if os.environ.get("CLARA_DB_PATH") else DB_DIR / "clara.db"
@@ -118,6 +123,16 @@ class Memory:
         CREATE INDEX IF NOT EXISTS sem_topic ON semantics(topic);
         CREATE INDEX IF NOT EXISTS goals_status ON goals(status);
         CREATE INDEX IF NOT EXISTS cand_status ON candidate_memory(status);
+        CREATE TABLE IF NOT EXISTS audit(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts REAL,
+            action TEXT,
+            topic TEXT,
+            fact TEXT,
+            source TEXT,
+            confidence REAL,
+            detail TEXT
+        );
         """
         self.conn.executescript(ddl)
         try:
@@ -183,7 +198,24 @@ class Memory:
                 self.add_goal(g, p, d)
         self.set_trait("born_at", self.get_trait("born_at", now()))
         self.set_trait("name", "CLARA")
-        self.set_trait("version", "1.2")
+        self.set_trait("version", _VERSION)
+
+    def _append_audit(self, action, topic, fact, source, confidence, detail=None):
+        try:
+            self.conn.execute(
+                "INSERT INTO audit(ts,action,topic,fact,source,confidence,detail) VALUES(?,?,?,?,?,?,?)",
+                (now(), action, topic, fact, source, confidence, detail),
+            )
+            self.conn.commit()
+        except Exception:
+            pass
+        try:
+            p = DB_DIR / "audit.jsonl"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with p.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"action": action, "topic": topic, "fact": fact, "source": source, "confidence": confidence, "detail": detail, "ts": now()}, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     # ---------------- RESEARCH + TOPIC DEDUP ----------------
     def log_research(self, topic, source="web", result_summary="", usefulness=0.5, harm=False):
@@ -284,15 +316,18 @@ class Memory:
                 c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=? WHERE id=?",
                           (boosted, old["access_count"]+1, now(), old["id"]))
                 self.conn.commit()
+                self._append_audit("learn", topic, fact, source, confidence)
                 return old["id"]
             nc = min(1.0, max(old["confidence"], confidence) + boost)
             c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=?, source=?, language=? WHERE id=?",
                       (nc, old["access_count"]+1, now(), source, lang, old["id"]))
             self.conn.commit()
+            self._append_audit("learn", topic, fact, source, confidence)
             return old["id"]
         c.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source,language) VALUES(?,?,?,?,?,?,?)",
                   (now(), topic.strip() if topic else "general", fact, confidence, now(), source, lang))
         self.conn.commit()
+        self._append_audit("learn", topic, fact, source, confidence)
         return c.lastrowid
 
     def forget(self, fact_id):

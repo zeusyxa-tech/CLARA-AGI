@@ -1,0 +1,55 @@
+{"action": "learn", "topic": "test_audit", "fact": "fact from audit", "source": "audit_test", "confidence": 0.5, "detail": null, "ts": 1787406315.0741131}
+{"action": "learn", "topic": "test_audit2", "fact": "fact2", "source": "audit_test2", "confidence": 0.5, "detail": null, "ts": 1787406506.330958}
+{"action": "learn", "topic": "user_statement", "fact": "tôi tên là Huy, tôi năm nay 28 tuổi, tôi làm nghề lập trình", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479001.5777335}
+{"action": "learn", "topic": "user_name", "fact": "Người dùng tên là Huy", "source": "user_taught", "confidence": 0.9, "detail": null, "ts": 1787479001.5794947}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích chạy bộ", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479001.6317956}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng thích chạy bộ", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479001.6322787}
+{"action": "learn", "topic": "user_statement", "fact": "tôi ghét mùa đông", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479001.6770544}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng ghét mùa đông", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479001.6773984}
+{"action": "learn", "topic": "lesson", "fact": "Tiếp tục ghi nhớ sở thích & thông tin người dùng chia sẻ.", "source": "dream", "confidence": 0.6, "detail": null, "ts": 1787479001.678682}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích ở quê", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479001.7207115}
+{"action": "learn", "topic": "user_location", "fact": "Người dùng ở quê", "source": "user_taught", "confidence": 0.75, "detail": null, "ts": 1787479001.721055}
+{"action": "learn", "topic": "user_statement", "fact": "tôi tên là Huy, tôi năm nay 28 tuổi, tôi làm nghề lập trình", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479125.0133946}
+{"action": "learn", "topic": "user_name", "fact": "Người dùng tên là Huy", "source": "user_taught", "confidence": 0.9, "detail": null, "ts": 1787479125.014893}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích chạy bộ", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479125.0615585}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng thích chạy bộ", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479125.0619617}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787479255.745329}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787479408.9657264}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787479487.8227525}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787479719.4158258}
+{"action": "learn", "topic": "user_statement", "fact": "tôi tên là Huy, tôi năm nay 28 tuổi, tôi làm nghề lập trình", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479719.5043452}
+{"action": "learn", "topic": "user_name", "fact": "Người dùng tên là Huy", "source": "user_taught", "confidence": 0.9, "detail": null, "ts": 1787479719.5057344}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích chạy bộ", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479719.5510979}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng thích chạy bộ", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479719.5515182}
+{"action": "learn", "topic": "user_statement", "fact": "tôi ghét mùa đông", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479719.5937226}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng ghét mùa đông", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479719.594213}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích ở quê", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479719.639746}
+{"action": "learn", "topic": "user_location", "fact": "Người dùng ở quê", "source": "user_taught", "confidence": 0.75, "detail": null, "ts": 1787479719.6401484}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787479934.3911865}
+{"action": "learn", "topic": "user_statement", "fact": "tôi tên là Huy, tôi năm nay 28 tuổi, tôi làm nghề lập trình", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479934.4771438}
+{"action": "learn", "topic": "user_name", "fact": "Người dùng tên là Huy", "source": "user_taught", "confidence": 0.9, "detail": null, "ts": 1787479934.4784758}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích chạy bộ", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479934.524267}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng thích chạy bộ", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479934.5246594}
+{"action": "learn", "topic": "user_statement", "fact": "tôi ghét mùa đông", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479934.5660925}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng ghét mùa đông", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787479934.566432}
+{"action": "learn", "topic": "lesson", "fact": "Tiếp tục ghi nhớ sở thích & thông tin người dùng chia sẻ.", "source": "dream", "confidence": 0.6, "detail": null, "ts": 1787479934.5677452}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích ở quê", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787479934.6111643}
+{"action": "learn", "topic": "user_location", "fact": "Người dùng ở quê", "source": "user_taught", "confidence": 0.75, "detail": null, "ts": 1787479934.6114886}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787480039.1780562}
+{"action": "learn", "topic": "user_statement", "fact": "tôi tên là Huy, tôi năm nay 28 tuổi, tôi làm nghề lập trình", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480039.2725716}
+{"action": "learn", "topic": "user_name", "fact": "Người dùng tên là Huy", "source": "user_taught", "confidence": 0.9, "detail": null, "ts": 1787480039.2738423}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích chạy bộ", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480039.3195248}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng thích chạy bộ", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787480039.3199558}
+{"action": "learn", "topic": "user_statement", "fact": "tôi ghét mùa đông", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480039.362502}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng ghét mùa đông", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787480039.362849}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích ở quê", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480039.4057548}
+{"action": "learn", "topic": "user_location", "fact": "Người dùng ở quê", "source": "user_taught", "confidence": 0.75, "detail": null, "ts": 1787480039.406221}
+{"action": "learn", "topic": "audit_test", "fact": "fact1", "source": "user", "confidence": 0.9, "detail": null, "ts": 1787480069.1008382}
+{"action": "learn", "topic": "user_statement", "fact": "tôi tên là Huy, tôi năm nay 28 tuổi, tôi làm nghề lập trình", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480069.1880898}
+{"action": "learn", "topic": "user_name", "fact": "Người dùng tên là Huy", "source": "user_taught", "confidence": 0.9, "detail": null, "ts": 1787480069.1897848}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích chạy bộ", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480069.23463}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng thích chạy bộ", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787480069.235037}
+{"action": "learn", "topic": "user_statement", "fact": "tôi ghét mùa đông", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480069.2777605}
+{"action": "learn", "topic": "user_preference", "fact": "Người dùng ghét mùa đông", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787480069.278134}
+{"action": "learn", "topic": "user_statement", "fact": "tôi thích ở quê", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480069.3182015}
+{"action": "learn", "topic": "user_location", "fact": "Người dùng ở quê", "source": "user_taught", "confidence": 0.75, "detail": null, "ts": 1787480069.3185263}

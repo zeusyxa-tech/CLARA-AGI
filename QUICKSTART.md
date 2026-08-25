@@ -49,7 +49,7 @@ python main.py --voice
 - Bảo nó: `tôi tên là ..., tôi ở ..., tôi thích ...` — nó sẽ nhớ
 - Hỏi lại: `tôi tên gì?` — nó trả lời đúng
 - Bảo nó: `tính (2^8 * pi) / 17` — nó dùng công cụ tính
-- Bảo nó: `chạy python: print(sum(range(1,101)))` — nó chạy code Python sandbox an toàn
+- Bảo nó: `chạy python: print(sum(range(1,101)))` — nó chạy code Python sandbox an toàn (**cần flag `--dangerous-python`**)
 - Sau mỗi câu trả lời bạn có thể nói `tốt` hoặc `tệ vì ...` để nó học
 - Gõ `commands` để xem toàn bộ lệnh
 - Gõ `status` để xem bộ não của nó đang hoạt động ra sao
@@ -62,8 +62,8 @@ python main.py --voice
 **Q: Python tôi cần phiên bản nào?**
 A: Python 3.8 trở lên. Kiểm tra: `python --version`. Nếu chưa có, tải ở https://python.org (Windows nhớ tích "Add Python to PATH" khi cài).
 
-**Q: Tôi có thể chạy không cần internet không?**
-A: Có — sau khi cài xong Ollama và pull model, bạn có thể ngắt mạng hoàn toàn, CLARA vẫn chạy bình thường.
+**Q: Tôi có thể chạy không cần internet không?**  
+A: Có — mặc định CLARA chạy hoàn toàn local. Chỉ cần internet khi bạn bật `--self-improve`/`--load-skills`/`--allow-network` hoặc pull model Ollama lần đầu.
 
 **Q: File nó ghi ở đâu?**
 A: Mọi thứ CLARA biết (trí nhớ, tính cách, thủ tục tự tạo) nằm trong thư mục `data/clara.db`. Xóa thư mục `data` là nó "sinh ra lại từ đầu". File nó đọc/ghi khi nói chuyện nằm trong `workspace/`.
@@ -71,8 +71,8 @@ A: Mọi thứ CLARA biết (trí nhớ, tính cách, thủ tục tự tạo) n�
 **Q: Làm sao để sao lưu trí nhớ của CLARA?**
 A: Sao lưu thư mục `data/` là đủ. Gõ `export` trong lúc nói chuyện cũng sẽ xuất ra file JSON trong `data/`.
 
-**Q: Lỡ nó chạy code Python phá máy tôi thì sao?**
-A: Không sao — code chạy trong sandbox (chặn `open`, `eval`, `exec`, import bừa, timeout 8s, chạy process con bị cô lập) và chỉ có thể ghi file trong thư mục `workspace/`. Nó không thể hỏng hệ thống của bạn.
+**Q: Lỡ nó chạy code Python phá máy tôi thì sao?**  
+A: Mặc định `run_python` **tắt**. Khi bạn bật `--dangerous-python`, code chạy trong sandbox (chặn `open`, `eval`, `exec`, import bừa, timeout 8s, chạy process con) và chỉ có thể ghi file trong thư mục `workspace/`. Tuy nhiên, sandbox không thể bảo vệ khỏi prompt injection từ LLM brain — nên chỉ bật khi bạn tin tưởng input.
 
 **Q: Chạy chậm/không nhận Ollama?**
 A: Chạy `python main.py --micro` để về chế độ micro brain, hoặc kiểm tra Ollama đã chạy chưa bằng cách mở trình duyệt vào http://localhost:11434 — nếu thấy "Ollama is running" là OK.
