@@ -184,16 +184,22 @@ def tool_run_python(code: str, timeout: int = 8) -> str:
         return f"🛑 {e}"
     q = mp.Queue()
     p = mp.Process(target=_run_code_proc, args=(code, q), daemon=True)
-    p.start()
-    p.join(timeout)
-    if p.is_alive():
-        p.terminate()
-        p.join(1)
-        return f"⏱️ Code chạy quá {timeout}s, đã dừng."
-    if q.empty():
-        return "❌ Không có kết quả trả về."
-    status, val = q.get()
-    return val if status == "ok" else val
+    try:
+        p.start()
+        p.join(timeout)
+        if p.is_alive():
+            p.terminate()
+            p.join(1)
+            return f"⏱️ Code chạy quá {timeout}s, đã dừng."
+        if q.empty():
+            return "❌ Không có kết quả trả về."
+        status, val = q.get()
+        return val if status == "ok" else val
+    finally:
+        # Ensure process is cleaned up
+        if p.is_alive():
+            p.terminate()
+            p.join(1)
 
 
 # ---------- TOOL: search memory ----------

@@ -4,10 +4,21 @@ Không cần thư viện ngoài — dùng sqlite3 (Python mặc định).
 """
 import sqlite3, time, json, math, hashlib, os, unicodedata, re
 from pathlib import Path
+from config import get_config
 
-DB_DIR = Path(os.environ.get("CLARA_DB_DIR", "")) if os.environ.get("CLARA_DB_DIR") else Path(__file__).parent / "data"
+# Try to import sklearn for TF-IDF caching (optional - fallback to keyword scoring)
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    import numpy as np
+    _HAS_SKLEARN = True
+except ImportError:
+    _HAS_SKLEARN = False
+
+_memory_cfg = get_config("memory")
+DB_DIR = Path(_memory_cfg.get("db_dir", "data"))
 DB_DIR.mkdir(exist_ok=True)
-DB_PATH = Path(os.environ.get("CLARA_DB_PATH", "")) if os.environ.get("CLARA_DB_PATH") else DB_DIR / "clara.db"
+DB_PATH = Path(_memory_cfg.get("db_name", "clara.db"))
 WS_DIR = Path(__file__).parent / "workspace"
 WS_DIR.mkdir(exist_ok=True)
 
@@ -36,6 +47,13 @@ class Memory:
             self.conn.execute("PRAGMA synchronous=NORMAL;")
         except Exception:
             pass
+        # TF-IDF cache for semantic recall
+        self._tfidf_vectorizer = None
+        self._tfidf_matrix = None
+        self._tfidf_facts = []  # list of (topic, fact) for matrix rows
+        self._tfidf_dirty = True  # flag to indicate cache needs rebuild
+        self._max_semantics_recall = _memory_cfg.get("max_semantics_recall", 500)
+        self._min_confidence = _memory_cfg.get("min_confidence", 0.2)
         self._schema()
         self._seed()
 
@@ -279,26 +297,90 @@ class Memory:
     def forget(self, fact_id):
         self.conn.execute("DELETE FROM semantics WHERE id=?", (fact_id,))
         self.conn.commit()
+        self._tfidf_dirty = True  # Invalidate cache
+
+    def _rebuild_tfidf_cache(self):
+        """Rebuild TF-IDF vectorizer and matrix from current semantics."""
+        if not _HAS_SKLEARN:
+            return
+        c = self.conn.cursor()
+        rows = c.execute(
+            "SELECT topic, fact FROM semantics WHERE confidence>=? ORDER BY last_access DESC LIMIT ?",
+            (self._min_confidence, self._max_semantics_recall)
+        ).fetchall()
+        if not rows:
+            self._tfidf_vectorizer = None
+            self._tfidf_matrix = None
+            self._tfidf_facts = []
+            return
+        self._tfidf_facts = [(r["topic"], r["fact"]) for r in rows]
+        corpus = [topic + " " + fact for topic, fact in self._tfidf_facts]
+        # Use HashingVectorizer for memory efficiency if many docs, else TfidfVectorizer
+        if len(corpus) > 5000:
+            from sklearn.feature_extraction.text import HashingVectorizer
+            self._tfidf_vectorizer = HashingVectorizer(
+                n_features=2**16,
+                alternate_sign=False,
+                norm='l2',
+                lowercase=True,
+                ngram_range=(1, 2)
+            )
+            self._tfidf_matrix = self._tfidf_vectorizer.transform(corpus)
+        else:
+            self._tfidf_vectorizer = TfidfVectorizer(
+                lowercase=True,
+                ngram_range=(1, 2),
+                max_features=10000,
+                min_df=1,
+                max_df=0.95
+            )
+            self._tfidf_matrix = self._tfidf_vectorizer.fit_transform(corpus)
+        self._tfidf_dirty = False
+
+    def _get_tfidf_scores(self, query: str):
+        """Get TF-IDF cosine similarity scores for query against cached matrix."""
+        if self._tfidf_dirty or self._tfidf_vectorizer is None or self._tfidf_matrix is None:
+            self._rebuild_tfidf_cache()
+        if self._tfidf_vectorizer is None or self._tfidf_matrix is None:
+            return None
+        try:
+            q_vec = self._tfidf_vectorizer.transform([query])
+            scores = cosine_similarity(q_vec, self._tfidf_matrix).flatten()
+            return scores
+        except Exception:
+            return None
 
     def recall_semantics(self, query, limit=5, min_conf=0.2):
         c = self.conn.cursor()
-        rows = c.execute("SELECT * FROM semantics WHERE confidence>=? ORDER BY last_access DESC LIMIT 500",
-                         (min_conf,)).fetchall()
+        rows = c.execute(
+            "SELECT * FROM semantics WHERE confidence>=? ORDER BY last_access DESC LIMIT ?",
+            (min_conf, self._max_semantics_recall)
+        ).fetchall()
         qw = set(self._tok(query))
         scored = []
+        
+        # Try TF-IDF scores if sklearn available
+        tfidf_scores = self._get_tfidf_scores(query)
+        
         try:
             qvec = _embed(query)
         except Exception:
             qvec = None
-        for r in rows:
+        
+        for idx, r in enumerate(rows):
             rw = set(self._tok(r["topic"] + " " + r["fact"]))
             overlap = len(qw & rw)
-            if overlap == 0 and qvec is None:
+            if overlap == 0 and qvec is None and tfidf_scores is None:
                 continue
             common = qw & rw
             has_bigram = any("_" in tok for tok in common)
             kw_score = self._score_match(overlap, has_bigram) * r["confidence"] * (1 + math.log1p(r["access_count"]))
-            if qvec is not None:
+            
+            # Add TF-IDF score if available
+            if tfidf_scores is not None and idx < len(tfidf_scores):
+                tfidf_score = tfidf_scores[idx]
+                kw_score = 0.5 * kw_score + 0.5 * (1 + tfidf_score)  # combine with keyword score
+            elif qvec is not None:
                 rvec = _embed(r["topic"] + " " + r["fact"])
                 if rvec is not None:
                     kw_score = 0.55 * kw_score + 0.45 * (1 + cosine(qvec, rvec))
@@ -357,12 +439,21 @@ class Memory:
 
     def update_goal(self, gid, status=None, progress=None, priority=None):
         sets, vals = [], []
-        if status: sets.append("status=?"); vals.append(status)
-        if progress: sets.append("progress=?"); vals.append(progress)
-        if priority is not None: sets.append("priority=?"); vals.append(priority)
-        if not sets: return
+        if status:
+            sets.append("status=?")
+            vals.append(status)
+        if progress:
+            sets.append("progress=?")
+            vals.append(progress)
+        if priority is not None:
+            sets.append("priority=?")
+            vals.append(priority)
+        if not sets:
+            return
+        # Build query safely - sets contains only fixed column names
+        query = "UPDATE goals SET " + ", ".join(sets) + " WHERE id=?"
         vals.append(gid)
-        self.conn.execute(f"UPDATE goals SET {', '.join(sets)} WHERE id=?", vals)
+        self.conn.execute(query, vals)
         self.conn.commit()
 
     def complete_goal(self, gid, note="done"):

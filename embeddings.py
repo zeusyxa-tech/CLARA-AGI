@@ -11,16 +11,20 @@ import time
 import urllib.request
 from pathlib import Path
 
-try:
-    from memory import DB_DIR
-except Exception:
-    DB_DIR = Path(__file__).parent / "data"
+from config import get_config
 
+# Load from config
+_embed_cfg = get_config("embeddings")
+_llm_cfg = get_config("llm")
+_memory_cfg = get_config("memory")
+
+DEFAULT_EMBED_MODEL = _embed_cfg.get("model", "nomic-embed-text")
+OLLAMA_URL = _embed_cfg.get("ollama_url", _llm_cfg.get("ollama_url", "http://localhost:11434"))
+CACHE_ENABLED = _embed_cfg.get("cache_enabled", True)
+
+DB_DIR = Path(_memory_cfg.get("db_dir", "data"))
 DB_DIR.mkdir(exist_ok=True)
-EMBED_DB_PATH = DB_DIR / "embeddings.db"
-
-OLLAMA_URL = os.environ.get("CLARA_OLLAMA_URL", "http://localhost:11434")
-DEFAULT_EMBED_MODEL = "nomic-embed-text"
+EMBED_DB_PATH = DB_DIR / _memory_cfg.get("embeddings_db", "embeddings.db")
 
 
 def _get_conn():

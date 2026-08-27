@@ -1,8 +1,13 @@
-# Yêu cầu TỐI THIỂU: không cần cài gì thêm cả — Python 3.8+ là đủ để chạy CLI.
+# Yêu cầu TỐI THIỂU: Python 3.8+ và pyyaml là đủ để chạy CLI core.
+# (config.py import yaml ở top-level — THIẾT YẾU, không tùy chọn.)
 # Các gói dưới đây là TÙY CHỌN, chỉ cài khi bạn muốn:
 #   - giao diện web (--web)
 #   - chế độ giọng nói (--voice)
 #   - dùng LLM thật (cần cài Ollama riêng, không phải pip)
+#   - TF-IDF caching / BeautifulSoup (có fallback nếu thiếu)
+
+# BẮT BUỘC cho CLI core (config loader)
+PyYAML>=6.0
 
 # Web UI (tùy chọn)
 flask>=2.2
@@ -21,6 +26,12 @@ pyaudio>=0.2.13; sys_platform != "darwin"
 
 # Vision mode (tùy chọn):
 # Pillow>=9.0
+
+# ML/NLP (tùy chọn - for TF-IDF caching, skill validation, etc.):
+# scikit-learn>=1.3
+# numpy>=1.24
+# beautifulsoup4>=4.12
+# lxml>=4.9
 
 # LLM local không dùng pip — cài Ollama từ https://ollama.com rồi:
 #   ollama pull qwen2.5:1.5b

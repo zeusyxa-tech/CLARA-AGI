@@ -1,0 +1,105 @@
+# CLARA-AGI Configuration
+# Tất cả cấu hình tập trung ở đây - không hardcode trong code
+
+# === LLM Backend ===
+llm:
+  backend: "ollama"           # "ollama" | "openai" | "micro" (fallback)
+  ollama_url: "http://localhost:11434"
+  default_model: "qwen2.5:1.5b"
+  candidate_models:
+    - "qwen2.5:3b"
+    - "qwen2.5:1.5b"
+    - "qwen2.5:0.5b"
+    - "phi3.5:mini"
+    - "gemma2:2b"
+    - "tinyllama"
+    - "llama3.2:1b"
+    - "llama3.2:3b"
+    - "mistral:7b"
+  temperature: 0.5
+  num_predict: 400
+  request_timeout: 120
+
+# === Embeddings ===
+embeddings:
+  model: "nomic-embed-text"
+  ollama_url: "http://localhost:11434"
+  cache_enabled: true
+
+# === Memory ===
+memory:
+  db_dir: "data"
+  db_name: "clara.db"
+  embeddings_db: "embeddings.db"
+  workspace_dir: "workspace"
+  max_semantics_recall: 500
+  min_confidence: 0.2
+
+# === Tools ===
+tools:
+  python_timeout: 8
+  python_max_output_chars: 4000
+  calc_max_expression_length: 200
+  file_max_read_chars: 4000
+
+# === Web Search ===
+web:
+  search_engine: "duckduckgo"
+  max_results: 5
+  fetch_timeout: 15
+  fetch_max_chars: 4000
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+  retry_attempts: 3
+  retry_backoff_base: 2.0
+  retry_max_backoff: 30.0
+  rate_limit_delay: 1.0
+
+# === AutoLearner (Background Self-Improvement) ===
+autolearner:
+  enabled: false
+  interval_seconds: 25
+  max_steps: null
+  verbose: true
+  activities:
+    consolidate: 0.20
+    reflect_old: 0.15
+    self_qa: 0.15
+    dream: 0.10
+    goal_check: 0.10
+    curiosity: 0.10
+    lesson_delivery: 0.20
+
+# === Study Scheduler ===
+scheduler:
+  enabled: false
+  interval_seconds: 120
+  daily_quiz_count: 2
+  weekly_review_day: 6  # Sunday = 6
+
+# === Self-Improvement ===
+self_improve:
+  max_pages_research: 3
+  max_facts_per_page: 5
+  min_confidence: 0.5
+  dedup_threshold: 0.85
+
+# === Compliance ===
+compliance:
+  owner_policy_path: "owner_policy.json"
+  jurisdiction_priority: "Vietnam"
+
+# === Logging ===
+logging:
+  level: "INFO"
+  format: "json"
+  file: "logs/clara.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  console: true
+
+# === Agent ===
+agent:
+  working_memory_max_turns: 20
+  reflection_threshold: 5
+  rewrite_max_sentences: 4
+  default_language: "vi"

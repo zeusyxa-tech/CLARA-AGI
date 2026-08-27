@@ -10,3 +10,8 @@ skills_custom/_pending/*.py
 workspace/*
 !workspace/.gitkeep
 autopilot.pid
+# Runtime state (root-level db + logs, generated per-machine)
+clara.db
+clara.db-wal
+clara.db-shm
+logs/

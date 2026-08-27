@@ -4,16 +4,22 @@ Hỗ trợ: Ollama local (tự nhận), fallback là MicroLLM (template, chạy 
 """
 import json, urllib.request, re, time, os, hashlib, unicodedata
 from pathlib import Path
+from config import get_config
 
-DEFAULT_OLLAMA = "qwen2.5:1.5b"
-CANDIDATE_MODELS = [
+# Load from config
+_llm_cfg = get_config("llm")
+DEFAULT_OLLAMA = _llm_cfg.get("default_model", "qwen2.5:1.5b")
+CANDIDATE_MODELS = _llm_cfg.get("candidate_models", [
     "qwen2.5:3b", "qwen2.5:1.5b", "qwen2.5:0.5b",
     "phi3.5:mini", "gemma2:2b", "tinyllama", "llama3.2:1b", "llama3.2:3b",
     "mistral:7b",
-]
-OLLAMA_URL = os.environ.get("CLARA_OLLAMA_URL", "http://localhost:11434")
+])
+OLLAMA_URL = _llm_cfg.get("ollama_url", "http://localhost:11434")
 OPENAI_API_BASE = (os.environ.get("OPENAI_API_BASE") or "").rstrip("/") or f"{OLLAMA_URL}/v1"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "ollama")
+DEFAULT_TEMPERATURE = _llm_cfg.get("temperature", 0.5)
+DEFAULT_NUM_PREDICT = _llm_cfg.get("num_predict", 400)
+REQUEST_TIMEOUT = _llm_cfg.get("request_timeout", 120)
 
 
 # ---------------- OLLAMA ----------------
@@ -25,7 +31,7 @@ def ollama_list(url=OLLAMA_URL):
         return None
 
 
-def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400):
+def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=DEFAULT_TEMPERATURE, num_predict=DEFAULT_NUM_PREDICT):
     data = json.dumps({
         "model": model, "prompt": prompt, "stream": False,
         "options": {"temperature": temperature, "num_predict": num_predict,
@@ -33,12 +39,12 @@ def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, n
     }).encode()
     req = urllib.request.Request(f"{url}/api/generate", data=data,
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
         j = json.loads(resp.read())
     return (j.get("response") or "").strip()
 
 
-def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400):
+def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=DEFAULT_TEMPERATURE, num_predict=DEFAULT_NUM_PREDICT):
     data = json.dumps({
         "model": model, "messages": messages, "stream": False,
         "options": {"temperature": temperature, "num_predict": num_predict,
@@ -47,7 +53,7 @@ def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, tempera
     req = urllib.request.Request(f"{url}/api/chat", data=data,
                                  headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             j = json.loads(resp.read())
         choice = (((j.get("choices") or [{}])[0]).get("message") or {})
         return (choice.get("content") or "").strip()
@@ -57,7 +63,7 @@ def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, tempera
 
 # ---------------- OPENAI-COMPATIBLE ----------------
 def openai_chat(prompt, model=DEFAULT_OLLAMA, base_url=OPENAI_API_BASE, api_key=OPENAI_API_KEY,
-                temperature=0.5, num_predict=400):
+                temperature=DEFAULT_TEMPERATURE, num_predict=DEFAULT_NUM_PREDICT):
     url = f"{base_url}/chat/completions"
     payload = json.dumps({
         "model": model,
@@ -72,7 +78,7 @@ def openai_chat(prompt, model=DEFAULT_OLLAMA, base_url=OPENAI_API_BASE, api_key=
                                      "Content-Type": "application/json",
                                      "Authorization": f"Bearer {api_key}",
                                  })
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
         j = json.loads(resp.read())
     choice = (((j.get("choices") or [{}])[0]).get("message") or {})
     return (choice.get("content") or "").strip()
@@ -321,8 +327,13 @@ class MicroLLM:
     def _rewrite(self, prompt):
         m_ans = re.search(r"\[ANSWER\](.*?)\[/ANSWER\]", prompt, re.S)
         m_cri = re.search(r"\[CRITIQUE\](.*?)\[/CRITIQUE\]", prompt, re.S)
-        ans = m_ans.group(1).strip() if m_ans else prompt
+        ans = m_ans.group(1).strip() if m_ans else ""
         cri = m_cri.group(1) if m_cri else ""
+        # Nếu không có structured tag (trường hợp micro brain được gọi trực tiếp
+        # từ chat() với prompt chứa [WORKSPACE]), fallback sang _answer để sinh
+        # câu trả lời thực thay vì echo nguyên prompt.
+        if not ans:
+            return self._answer(prompt)
         # Heuristic rewrite: cắt bớt phần thừa
         lines = [l for l in ans.split("\n") if l.strip()]
         if lines:
@@ -386,7 +397,7 @@ class Brain:
         self.backend = "micro"
         self.model = model or DEFAULT_OLLAMA
         self.micro = MicroLLM()
-        self.temperature = 0.5
+        self.temperature = DEFAULT_TEMPERATURE
         if not force_micro and self.models is not None:
             names = [m.get("name","") for m in self.models]
             for cand in [self.model] + CANDIDATE_MODELS:
@@ -397,6 +408,7 @@ class Brain:
 
     def think(self, tag, prompt, **kw):
         t = kw.get("temperature", self.temperature)
+        num_predict = kw.get("num_predict", DEFAULT_NUM_PREDICT)
         out = ""
         if self.backend == "ollama":
             sys_prompt = self._tag_to_system(tag)
@@ -406,13 +418,13 @@ class Brain:
             ]
             try:
                 out = ollama_chat_messages(messages, model=self.model, temperature=t,
-                                           num_predict=kw.get("num_predict", 400)) or ""
+                                           num_predict=num_predict) or ""
             except Exception:
                 out = ""
             if not out:
                 try:
                     out = ollama_chat(f"{sys_prompt}\n{prompt}", model=self.model, temperature=t,
-                                      num_predict=kw.get("num_predict", 400))
+                                      num_predict=num_predict)
                 except Exception as e:
                     out = f"[ollama lỗi: {e}]\n"
         elif self.backend == "openai":
@@ -420,7 +432,7 @@ class Brain:
             full = f"{sys_prompt}\n{prompt}"
             try:
                 out = openai_chat(full, model=self.model, temperature=t,
-                                  num_predict=kw.get("num_predict", 400))
+                                  num_predict=num_predict)
             except Exception as e:
                 out = f"[openai lỗi: {e}]\n"
         out = strip_think(out)
