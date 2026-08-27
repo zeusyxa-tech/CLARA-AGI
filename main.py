@@ -388,6 +388,12 @@ class ClarasAGI:
             if len(answer) > 10:
                 self.mem.set_trait("verbosity", min(1.0, self.traits["verbosity"] + 0.01))
             
+            # Persist memory (học "nhớ:", cập nhật user model, lưu episode)
+            try:
+                self._persist_memory(text, answer)
+            except Exception as e:
+                logger.warning(f"Persist memory lỗi: {e}")
+            
             elapsed = time.time() - start
             logger.info(f"Turn {self.turn_count}: answering in {elapsed:.2f}s", 
                        extra={"response_len": len(answer), "tool_used": tool_used, "elapsed": elapsed})
@@ -399,6 +405,35 @@ class ClarasAGI:
             logger.critical(traceback_str)
             return f"❌ CLARA đang gặp sự cố kỹ thuật. Vui lòng thử lại sau."
     
+    def _persist_memory(self, text: str, answer: str):
+        """Lưu trí nhớ sau mỗi turn: học 'nhớ:', cập nhật user model, ghi episode."""
+        low = text.lower().strip()
+
+        # 1. Học kiến thức từ "nhớ:/học:/ghi nhớ:/note:"
+        if low.startswith(("nhớ", "ghi nhớ", "học", "note")):
+            m = re.match(r"^(nhớ|ghi nhớ|học|note)\s*[:\-]?\s*(.+)$", text, re.I)
+            if m:
+                fact = m.group(2).strip()
+                self.mem.learn("user_taught", fact, confidence=0.8, source="user_taught")
+                self.mem.remember_episode("learning", fact, importance=0.8, emotion=0.2)
+
+        # 2. Cập nhật user model từ các mẫu quen thuộc
+        # tên: "tôi tên Nam" / "tên tôi là Nam"
+        m_name = re.search(r"(?:tôi\s*tên|tên\s*tôi\s*(?:là|tên)?)\s*([A-ZÀ-Ỹ][a-zà-ỹ]*)", text, re.I)
+        if m_name:
+            self.mem.set_user("name", m_name.group(1), confidence=0.9)
+            self.mem.learn("user_name", f"Người dùng tên là {m_name.group(1)}", confidence=0.9, source="user_taught")
+        # thích: "thích lập trình Python"
+        m_like = re.search(r"thích\s+([^,.!?]+)", text, re.I)
+        if m_like:
+            item = m_like.group(1).strip()
+            self.mem.set_user("likes", [item], confidence=0.85, merge=True)
+            self.mem.learn("user_preference", f"Người dùng thích {item}", confidence=0.8, source="user_taught")
+
+        # 3. Luôn lưu episode hội thoại (cho episodic memory / dream)
+        self.mem.remember_episode("conversation", f"User: {text}\nCLARA: {answer}",
+                                  importance=0.4, emotion=0.0)
+
     def _detect_emotion(self, text: str) -> str:
         """Phát hiện cảm xúc đơn giản."""
         text_lower = text.lower()
@@ -590,6 +625,10 @@ def _interactive_loop(agent):
                 result = agent.chat(user_input)
                 print(result)
             except KeyboardInterrupt:
+                print("\n👋 Tạm biệt!")
+                break
+            except EOFError:
+                # Hết input (vd: pipe stdin vào) -> thoát sạch, không lặp vô tận
                 print("\n👋 Tạm biệt!")
                 break
             except Exception as e:

@@ -151,6 +151,11 @@ class MicroLLM:
         sem = self._sem_hits(wm)
         tr = self._tool_result(prompt)
 
+        # "nhớ: ..." / "học: ..." / "ghi nhớ: ..." — học kiến thức (ưu tiên trước user_q_re)
+        m_learn = re.match(r"^(nhớ|ghi nhớ|note|học)\s*[:\-]?\s*(.+)$", user_msg, re.I)
+        if m_learn:
+            return f"✅ Đã ghi nhớ: '{m_learn.group(2).strip()}'."
+
         # câu hỏi về chính người dùng
         user_q_re = re.compile(
             r"tên tôi|tôi tên|tôi tên gì|tôi bao nhiêu tuổi|tuổi tôi|"
@@ -212,11 +217,6 @@ class MicroLLM:
                 if sc > bs:
                     bs, best = sc, s
             return f"Theo những gì tôi đã học: {best}" + ("." if not best.endswith(".") else "")
-
-        # "nhớ: ..."
-        m = re.match(r"^(nhớ|ghi nhớ|note|học)\s*[:\-]?\s*(.+)$", user_msg, re.I)
-        if m:
-            return f"✅ Đã ghi nhớ: '{m.group(2).strip()}'."
 
         # câu hỏi
         if user_msg.endswith("?") or any(low.startswith(k) for k in ["tại sao","vì sao","làm sao","như thế nào","gì","ai","ở đâu","bao nhiêu"]):
