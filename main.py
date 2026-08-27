@@ -686,12 +686,19 @@ def main():
         # Khởi agent (+ threads nếu có)
         agent, threads = _setup_agent(args)
 
-        # --daemon: in sẵn sàng rồi thoát (dùng --once để test sau)
+        # --daemon: in sẵn sàng rồi giữ process sống (threads nền chạy tiếp)
         if args.daemon:
             logger.info("CLARA-AGI daemon started")
             print("✅ CLARA-AGI daemon đang chạy...")
             print("• Dùng `python main.py --once \"câu hỏi\"` để test")
             print("• Dùng `/status` trong chat để xem trạng thái")
+            print("• Ctrl+C để dừng daemon")
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("CLARA-AGI daemon stopped")
+                print("\n👋 Daemon dừng.")
             return
 
         # --web: giao diện web
