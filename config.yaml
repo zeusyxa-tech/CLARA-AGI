@@ -83,6 +83,13 @@ self_improve:
   min_confidence: 0.5
   dedup_threshold: 0.85
 
+# === Self-Upgrade (tự nâng cấp chính mình) ===
+self_upgrade:
+  enabled: true
+  interval_seconds: 600       # tự quét & vá mỗi 10 phút khi chạy --self-improve
+  auto_fix_severity: "medium" # chỉ tự vá lỗi mức medium (bare-except) để an toàn
+  max_backups: 20
+
 # === Compliance ===
 compliance:
   owner_policy_path: "owner_policy.json"

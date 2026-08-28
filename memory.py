@@ -492,6 +492,65 @@ class Memory:
     def all_user(self):
         return [dict(r) for r in self.conn.execute("SELECT * FROM user_model").fetchall()]
 
+    # ---------------- FEEDBACK LEARNING (học từ feedback) ----------------
+    def feedback_learn(self, correction: str, positive: bool = False):
+        """
+        Học từ feedback của người dùng để CLARA thông minh hơn theo thời gian.
+        - positive=True : ghi nhận cách trả lời được khen -> củng cố.
+        - positive=False: ghi nhận phần sửa (correction) -> học cách đúng,
+          đồng thời hạ confidence của các fact mâu thuẫn để tránh lặp lại sai.
+        """
+        correction = (correction or "").strip()
+        if not correction:
+            return
+        if positive:
+            self.learn("feedback_ok", correction, confidence=0.85, source="user_feedback")
+            return
+        # negative feedback: lưu cách sửa đúng
+        self.learn("correction", correction, confidence=0.92, source="user_feedback")
+        # hạ confidence các fact mâu thuẫn (có từ khóa trùng với correction)
+        qw = set(self._tok(correction))
+        if qw:
+            rows = self.conn.execute(
+                "SELECT id, fact, confidence FROM semantics WHERE confidence>=0.3"
+            ).fetchall()
+            for r in rows:
+                rw = set(self._tok(r["fact"]))
+                if len(qw & rw) >= 2 and r["confidence"] > 0.35:
+                    new_c = max(0.2, r["confidence"] - 0.15)
+                    self.conn.execute(
+                        "UPDATE semantics SET confidence=? WHERE id=?", (new_c, r["id"])
+                    )
+            self.conn.commit()
+
+    # ---------------- CONSOLIDATE (gom nhớ định kỳ) ----------------
+    def consolidate_memory(self, limit=200):
+        """
+        Gom nhớ: gộp các fact trùng lặp (theo normalized text), giữ confidence cao nhất,
+        xóa bản sao. Trả về số fact bị gộp. Càng chạy thường xuyên bộ nhớ càng sạch.
+        """
+        rows = self.conn.execute(
+            "SELECT id, fact, confidence, source FROM semantics ORDER BY confidence DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        seen = {}
+        removed = 0
+        for r in rows:
+            key = self._normalize(r["fact"])
+            if not key:
+                continue
+            if key in seen:
+                # xóa bản trùng, giữ bản có confidence cao hơn
+                dup_id = r["id"]
+                self.conn.execute("DELETE FROM semantics WHERE id=?", (dup_id,))
+                removed += 1
+            else:
+                seen[key] = r["id"]
+        if removed:
+            self.conn.commit()
+            self._tfidf_dirty = True
+        return removed
+
     # ---------------- DREAMS ----------------
     def add_dream(self, summary, lessons):
         self.conn.execute("INSERT INTO dreams(ts,summary,lessons) VALUES(?,?,?)",

@@ -8,6 +8,7 @@ import os
 import argparse
 import json
 import traceback
+from pathlib import Path
 
 # Setup logging FIRST
 import re
@@ -42,6 +43,13 @@ try:
 except Exception as e:
     _HAS_AUTOLearn = False
     logger.warning(f"Không tải được autolearn: {e}")
+
+try:
+    from self_upgrade import propose_upgrade, scan_for_issues, list_backups, rollback as upgrade_rollback, SelfUpgradeLoop
+    _HAS_SELF_UPGRADE = True
+except Exception as e:
+    _HAS_SELF_UPGRADE = False
+    logger.warning(f"Không tải được self_upgrade: {e}")
 
 
 class ClarasAGI:
@@ -115,6 +123,94 @@ class ClarasAGI:
                 return self._cmd_help()
         
         return None
+
+    # ------------------ META COMMANDS (feedback / upgrade / consolidate) ------------------
+    def _handle_meta_commands(self, text: str):
+        low = text.lower().strip()
+        # Feedback học: "tốt/tệ vì <sửa>"
+        if low.startswith(("tốt", "hay", "tuyệt", "good", "great", "love")):
+            return self._feedback_command(text, positive=True)
+        if low.startswith(("tệ", "sai", "dốt", "chán", "bad", "kém", "ghét", "bực")):
+            return self._feedback_command(text, positive=False)
+        if low.startswith("feedback"):
+            return self._feedback_command(text, positive=None)
+        if low.startswith("upgrade") or low.startswith("tự nâng cấp"):
+            return self._upgrade_command(text)
+        if low.startswith("gomnhớ") or low.startswith("consolidate"):
+            return self._consolidate_command(text)
+        return None
+
+    def _feedback_command(self, text: str, positive=None):
+        """Học từ feedback của người dùng — CLARA thông minh hơn theo thời gian."""
+        low = text.lower().strip()
+        correction = re.sub(
+            r"^(tốt|tệ|sai|hay|good|bad|ok|đúng|cảm ơn|tuyệt|kém|ghét|bực|great|love|tuyệt vời|feedback)[\s:,.\\-\\>]*",
+            "", low, count=1).strip()
+        if positive is None:
+            # tự suy ra: có từ khen -> dương, có từ chê -> âm
+            if any(w in low for w in ["tốt", "hay", "đúng", "tuyệt", "great", "good", "love"]):
+                positive = True
+            elif any(w in low for w in ["tệ", "sai", "dốt", "chán", "bad", "kém", "ghét", "bực"]):
+                positive = False
+            else:
+                positive = True
+        if correction and positive is False:
+            self.mem.feedback_learn(correction, positive=False)
+            self.mem.remember_episode("correction", correction, importance=0.8, emotion=-0.4)
+            # hạ confidence episode sai gần nhất
+            last = self.mem.recall_episodes(kind="conversation", limit=1, recent_only=True)
+            if last:
+                self.mem.remember_episode("mistake", f"Sai: {last[0]['content'][:200]}", importance=0.9, emotion=-0.5)
+            return "✅ Cảm ơn, tôi đã ghi nhận cách sửa và sẽ tránh lặp lại."
+        if correction and positive is True:
+            self.mem.feedback_learn(correction, positive=True)
+            return "✅ Cảm ơn, tôi sẽ củng cố cách trả lời này."
+        if positive is True:
+            return "✅ Cảm ơn bạn! Tôi ghi nhận là làm tốt rồi."
+        return "Hãy nói rõ 'tốt' hoặc 'tệ vì <sửa lại>' để tôi học nhé."
+
+    def _upgrade_command(self, text: str):
+        if not _HAS_SELF_UPGRADE:
+            return "❌ Module self_upgrade không khả dụng."
+        arg = text.strip()
+        arg = re.sub(r"^(upgrade|tự nâng cấp)\s*", "", arg, flags=re.I).strip()
+        if not arg or arg == "scan":
+            issues = scan_for_issues(self)
+            if not issues:
+                return "🔧 Quét xong: chưa thấy lỗi dễ tự vá. (Dùng `upgrade <file>|<yêu cầu>` để nhờ tôi sửa.)"
+            lines = [f"🔧 Quét thấy {len(issues)} điểm (tự vá mức medium):"]
+            for x in issues[:12]:
+                lines.append(f"  • {x['file']}:{x['line']} — {x['issue']} ({x['severity']})")
+            return "\n".join(lines)
+        if arg.startswith("rollback"):
+            fn = arg.split(None, 1)[1].strip() if " " in arg else ""
+            if not fn:
+                bks = list_backups()
+                return "🗂️ Backup hiện có:\n  " + ("\n  ".join(bks) if bks else "(không có)") + "\nDùng: upgrade rollback <file>"
+            return upgrade_rollback(fn)
+        if arg.startswith("loop"):
+            if not hasattr(self, "_upgrade_loop"):
+                self._upgrade_loop = SelfUpgradeLoop(self, interval=600, verbose=True)
+            self._upgrade_loop.start()
+            return "🔧 Đã bật vòng lặp tự nâng cấp nền (quét mỗi 10 phút)."
+        # format: <file>|<instruction>
+        if "|" in arg:
+            fn, instr = arg.split("|", 1)
+            res = propose_upgrade(self, fn.strip(), instr.strip())
+            if res.get("ok"):
+                return (f"✅ Đã tự nâng cấp {fn}: {res.get('diff_summary')}\n"
+                        f"   git checkpoint: {res.get('git')} | backup: {Path(res['backup']).name}\n"
+                        f"   (rollback: `upgrade rollback {fn}`)")
+            return f"⚠️ Không nâng cấp được: {res.get('error','')}"
+        return ("Dùng:\n"
+                "  upgrade scan                 — quét lỗi có thể tự vá\n"
+                "  upgrade <file>|<yêu cầu>     — tự sửa file\n"
+                "  upgrade loop                 — bật tự nâng cấp nền\n"
+                "  upgrade rollback <file>      — hoàn tác")
+
+    def _consolidate_command(self, text: str):
+        removed = self.mem.consolidate_memory()
+        return f"🧹 Đã gom nhớ: xóa {removed} mẩu kiến thức trùng lặp." if removed else "🧹 Bộ nhớ đã sạch, không có trùng lặp."
 
     def _cmd_status(self) -> str:
         """Trạng thái agent."""
@@ -204,7 +300,12 @@ class ClarasAGI:
         special = self._handle_special_commands(text)
         if special is not None:
             return special
-        
+
+        # Plain-text meta commands (feedback học, tự nâng cấp, gom nhớ)
+        meta = self._handle_meta_commands(text)
+        if meta is not None:
+            return meta
+
         # Log bắt đầu turn
         logger.info(f"Turn {self.turn_count}: received user input", 
                    extra={"user_text": text[:100] if len(text) > 100 else text})
@@ -229,10 +330,15 @@ class ClarasAGI:
         
         # 2. RETRIEVE
         try:
-            sem = self.mem.recall_semantics(text, limit=5)
-            epi = self.mem.recall_episodes(text, limit=5)
+            sem = self.mem.recall_semantics(text, limit=8)
+            epi = self.mem.recall_episodes(text, limit=6)
             procs = self.mem.find_relevant_procedure(text)
             goals = self.mem.get_active_goals(4)
+            # recall mở rộng: lấy thêm fact phẳng để tăng context (thông minh hơn)
+            extra_facts = self.mem.recall_semantics("", limit=5)
+            for ef in extra_facts:
+                if ef not in sem and len(sem) < 10:
+                    sem.append(ef)
         except Exception as e:
             logger.error(f"Retrieve error: {e}")
             sem, epi, procs, goals = [], [], None, []
@@ -558,6 +664,16 @@ def _setup_agent(args):
             logger.info("AutoLearner started")
         except Exception as e:
             logger.warning(f"Không khởi được AutoLearner: {e}")
+
+    # Self-upgrade (tự nâng cấp chính mình) — tự bật nếu có flag --self-improve
+    if args.self_improve and _HAS_SELF_UPGRADE:
+        try:
+            up = SelfUpgradeLoop(agent, interval=config.section("self_upgrade").get("interval_seconds", 600), verbose=True)
+            up.start()
+            threads.append(up)
+            logger.info("SelfUpgradeLoop started (tự nâng cấp nền)")
+        except Exception as e:
+            logger.warning(f"Không khởi được SelfUpgradeLoop: {e}")
 
     # Self-improve (tự nghiên cứu web học thêm)
     if args.self_improve and _HAS_SELF_IMPROVE:
