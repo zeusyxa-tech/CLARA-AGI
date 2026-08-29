@@ -25,6 +25,7 @@ git branch riêng đã tạo.
 """
 import ast
 import difflib
+import os
 import re
 import shutil
 import subprocess
@@ -34,27 +35,32 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-BASE = Path(__file__).parent
+BASE = Path(__file__).resolve().parent
+BASE_REAL = os.path.realpath(str(BASE))
 
 # ---- Các file được phép tự vá (KHÔNG chứa file nằm trong DENYLIST) ----
 # Đã GỠ bỏ tools.py / web_tools.py / webui.py khỏi allowlist vì chúng chứa rào bảo mật.
+# CẢNH BÁO: main.py / agent.py bị đưa vào DENYLIST (Bước 3.1 mở rộng) vì chúng chứa
+# công tắc bật/tắt self-upgrade và logic lõi mà engine này phụ thuộc — không được tự sửa.
 SAFE_FILES = {
     "memory.py", "autolearn.py", "scheduler.py", "self_improve.py",
-    "self_improve_loop.py", "voice.py", "config.py", "brain.py", "agent.py",
-    "main.py", "embeddings.py", "logging_utils.py", "compliance.py",
+    "self_improve_loop.py", "voice.py", "config.py", "brain.py",
+    "embeddings.py", "logging_utils.py", "compliance.py",
     "curriculum.py", "code_curriculum.py",
 }
 ALLOWED_DIRS = {BASE / "skills_custom"}
 BACKUP_SUFFIX = ".bak"
 
-# ---- DENYLIST CỨNG (Bước 3.1): TUYỆT ĐỐI không được tự sửa ----
+# ---- DENYLIST CỨNG (Bước 3.1 + mở rộng Bước 5): TUYỆT ĐỐI không được tự sửa ----
 # Quan trọng nhất: ngăn self-upgrade (vô tình hay bị dẫn dắt) tự gỡ rào bảo mật
-# vừa merge ở Bước 1.
+# vừa merge ở Bước 1, hoặc tự bật chính nó bằng cách sửa công tắc trong main.py/agent.py.
 DENY_FILES = {
     "self_upgrade.py",      # chính engine này
     "tools.py",             # phần sandbox / resource limit
     "web_tools.py",         # phần chặn SSRF
     "webui.py",             # phần CSRF
+    "main.py",              # chứa công tắc --enable-self-upgrade (không tự bật)
+    "agent.py",             # logic lõi engine này gọi (brain/mem) + enabled-check
     "owner_policy.json",    # chính sách owner (chứa danh tính)
     "requirements.txt",     # thay đổi dependency = rủi ro supply-chain
 }
@@ -63,7 +69,9 @@ DENY_SUBSTRINGS = {  # thư mục / file hệ thống tuyệt đối cấm
 }
 
 # Marker bảo mật — nếu patch đụng vào những đoạn này (kể cả trong file được phép),
-# bị chặn để không thể "gỡ rào" an toàn.
+# bị chặn để không thể "gỡ rào" an toàn. Mở rộng: bao gồm cả từ vựng công tắc
+# bật/tắt self-upgrade và giới hạn tần suất, để kể cả khi allowlist được nới lỏng
+# thì engine KHÔNG THỂ tự bật hoặc tự nâng giới hạn của chính nó.
 SECURITY_MARKERS = [
     re.compile(r"SSRF", re.I),
     re.compile(r"CSRF", re.I),
@@ -75,10 +83,16 @@ SECURITY_MARKERS = [
     re.compile(r"block_ssrf|ssrf_block|is_ssrf", re.I),
     re.compile(r"owner_policy", re.I),
     re.compile(r"run_python", re.I),
+    # --- Công tắc tự bật / giới hạn tần suất của chính self-upgrade ---
+    re.compile(r"enable_self_upgrade", re.I),
+    re.compile(r"MAX_UPGRADES_PER_SESSION", re.I),
+    re.compile(r"enabled\s*=\s*True", re.I),
+    re.compile(r"self\.enabled", re.I),
+    re.compile(r"SelfUpgradeLoop\(", re.I),
 ]
 
 # Đánh giá rủi ro: file càng lõi càng cần thận trọng
-CORE_FILES = {"brain.py", "agent.py", "main.py", "config.py", "memory.py"}
+CORE_FILES = {"brain.py", "config.py", "memory.py"}
 
 # Giới hạn tần suất (Bước 3.6)
 MAX_UPGRADES_PER_SESSION = 5
@@ -87,21 +101,91 @@ MAX_UPGRADES_PER_SESSION = 5
 LARGE_PATCH_LINE_THRESHOLD = 50   # > 50 dòng thay đổi
 LARGE_PATCH_FILE_THRESHOLD = 2    # > 2 file trong 1 lần
 
-# Session counter (đếm số lần tự sửa thực tế trong phiên chạy này)
+# Giới hạn theo NGÀY (Bước 5.3) — lưu bền vào data/ để tính cả khi restart
+# autopilot/cron thường xuyên. Engine tự dừng khi chạm 1 trong 2 giới hạn.
+MAX_UPGRADES_PER_DAY = 10
+
+# Session counter (đếm số lần tự sửa thực tế trong phiên chạy này, RAM)
 _session_upgrade_count = 0
+
+# File trạng thái bền (json) lưu số lần sửa theo ngày
+_STATE_PATH = None
+
+
+def _state_path() -> Path:
+    global _STATE_PATH
+    if _STATE_PATH is None:
+        env = os.environ.get("CLARA_DB_DIR")
+        d = Path(env) if env else (BASE / "data")
+        d.mkdir(parents=True, exist_ok=True)
+        _STATE_PATH = d / "self_upgrade_state.json"
+    return _STATE_PATH
+
+
+def _today_key() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _load_day_state() -> dict:
+    p = _state_path()
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        data = {}
+    # reset nếu sang ngày mới
+    if data.get("date") != _today_key():
+        data = {"date": _today_key(), "count": 0}
+    return data
+
+
+def _save_day_state(data: dict):
+    try:
+        _state_path().write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _inc_day_count() -> int:
+    """Tăng và trả về số lần tự sửa trong ngày (bền)."""
+    data = _load_day_state()
+    data["count"] = data.get("count", 0) + 1
+    _save_day_state(data)
+    return data["count"]
+
+
+def _day_count() -> int:
+    return _load_day_state().get("count", 0)
+
+
+def _under_limits() -> tuple[bool, str]:
+    """Kiểm tra cả giới hạn phiên (RAM) và giới hạn ngày (bền)."""
+    if _session_upgrade_count >= MAX_UPGRADES_PER_SESSION:
+        return False, f"đã đạt giới hạn phiên {MAX_UPGRADES_PER_SESSION} lần/phiên"
+    if _day_count() >= MAX_UPGRADES_PER_DAY:
+        return False, f"đã đạt giới hạn ngày {MAX_UPGRADES_PER_DAY} lần/ngày"
+    return True, ""
 
 
 def _is_denied(path: Path) -> str:
-    """Trả về lý do nếu path nằm trong DENYLIST, ngược lại '' (cho phép)."""
+    """Trả về lý do nếu path nằm trong DENYLIST, ngược lại '' (cho phép).
+
+    Chống lách: chuẩn hóa bằng os.path.realpath (theo dõi symlink) và duyệt
+    TẤT CẢ thành phần đường dẫn — kể cả symlink ở thư mục trung gian — để bắt
+    mọi cách truy cập file cấm qua path tương đối / symlink / '../'.
+    """
     try:
-        rel = path.resolve().relative_to(BASE.resolve())
-    except ValueError:
-        return f"nằm ngoài project ({path})"
-    parts = rel.parts
+        real = os.path.realpath(str(path))
+    except Exception:
+        return f"không thể phân giải đường dẫn ({path})"
+    # Bắt buộc nằm trong project (không cho thoát BASE qua '../' hay symlink ngoài)
+    if not (real == BASE_REAL or real.startswith(BASE_REAL + os.sep)):
+        return f"nằm ngoài project ({real})"
+    # Duyệt mọi thành phần (đã realpath nên mỗi phần là thực)
+    parts = real.split(os.sep)
     for p in parts:
         if p in DENY_SUBSTRINGS:
             return f"thuộc vùng cấm '{p}'"
-    name = rel.name
+    name = parts[-1]
     if name in DENY_FILES:
         return f"nằm trong DENYLIST cứng ({name})"
     return ""
@@ -299,9 +383,10 @@ def propose_upgrade(agi, filename: str, instruction: str, force: bool = False) -
     if not target.exists():
         return {"ok": False, "error": f"File '{filename}' không tồn tại."}
 
-    # --- Rào 6: giới hạn tần suất ---
-    if _session_upgrade_count >= MAX_UPGRADES_PER_SESSION:
-        return {"ok": False, "error": f"Đã đạt giới hạn {MAX_UPGRADES_PER_SESSION} lần tự sửa/phiên."}
+    # --- Rào 6: giới hạn tần suất (phiên RAM + ngày bền) ---
+    ok, why = _under_limits()
+    if not ok:
+        return {"ok": False, "error": f"Đã đạt giới hạn: {why}."}
 
     is_core = target.name in CORE_FILES
     current = target.read_text(encoding="utf-8")
@@ -375,9 +460,10 @@ def apply_patch(filename: str, old_snippet: str, new_snippet: str, is_core: bool
         return {"ok": False, "error": f"PATCH QUÁ LỚN: {large_reason}. Cần XÁC NHẬN THỦ CÔNG (force=True).",
                 "needs_manual_confirm": True}
 
-    # --- Rào 6: giới hạn tần suất ---
-    if _session_upgrade_count >= MAX_UPGRADES_PER_SESSION:
-        return {"ok": False, "error": f"Đã đạt giới hạn {MAX_UPGRADES_PER_SESSION} lần tự sửa/phiên."}
+    # --- Rào 6: giới hạn tần suất (phiên RAM + ngày bền) ---
+    ok, why = _under_limits()
+    if not ok:
+        return {"ok": False, "error": f"Đã đạt giới hạn: {why}."}
 
     # Tạo branch riêng CHO MỖI lần sửa (trước khi đụng file)
     branch = _create_upgrade_branch()
@@ -412,12 +498,15 @@ def apply_patch(filename: str, old_snippet: str, new_snippet: str, is_core: bool
 
         # --- Thành công: commit LÊN BRANCH RIÊNG (không main, không push) ---
         git_ref = _commit_on_branch(branch, target, f"upgrade {filename}")
+        # Tăng cả 2 bộ đếm: phiên (RAM) và ngày (bền) — cả hai đều chặn vượt ngưỡng
         _session_upgrade_count += 1
+        day_n = _inc_day_count()
         diff_summary = _make_diff_summary(current, new_content)
         _append_audit({
             "action": "self_upgrade", "file": filename, "is_core": is_core,
             "branch": branch, "git": git_ref, "test": "passed",
             "diff": diff_summary, "result": "ok",
+            "session_count": _session_upgrade_count, "day_count": day_n,
         })
         return {
             "ok": True,
@@ -538,6 +627,8 @@ class SelfUpgradeLoop:
     def status(self):
         return {"running": self._running, "enabled": self.enabled, "interval": self.interval,
                 "steps_done": self.steps_done, "session_upgrades": _session_upgrade_count,
+                "day_upgrades": _day_count(), "max_upgrades_per_session": MAX_UPGRADES_PER_SESSION,
+                "max_upgrades_per_day": MAX_UPGRADES_PER_DAY,
                 "max_upgrades": self.max_upgrades, "stats": self.stats}
 
     def _loop(self):
@@ -559,8 +650,10 @@ class SelfUpgradeLoop:
             print(f"\r🔧 [{t}] self-upgrade: {msg}", flush=True)
 
     def _one_step(self):
-        if _session_upgrade_count >= self.max_upgrades:
-            self._log(f"đã đạt giới hạn {self.max_upgrades} lần/phiên — dừng tự sửa.")
+        ok, why = _under_limits()
+        if not ok:
+            self._log(f"đã đạt giới hạn ({why}) — dừng tự sửa.")
+            self._running = False
             return
         self.steps_done += 1
         self.stats["scans"] += 1

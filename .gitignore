@@ -19,3 +19,5 @@ clara.db-shm
 logs/
 # Local owner identity with real PII — MUST NOT be committed (split from owner_policy.json)
 owner_identity.local.json
+# Self-upgrade persistent daily counter (runtime state, regenerated per machine)
+data/self_upgrade_state.json
