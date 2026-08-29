@@ -17,3 +17,5 @@ clara.db
 clara.db-wal
 clara.db-shm
 logs/
+# Local owner identity with real PII — MUST NOT be committed (split from owner_policy.json)
+owner_identity.local.json

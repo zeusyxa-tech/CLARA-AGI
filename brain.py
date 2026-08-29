@@ -1,10 +1,26 @@
 """
 CLARA-AGI v1.4 - Brain abstraction.
 Hỗ trợ: Ollama local (tự nhận), fallback là MicroLLM (template, chạy được mọi máy).
+Khi backend chính (Ollama/OpenAI) lỗi THẬT: ghi log lỗi ra file/console và LUÔN
+fallback về self.micro.think() — KHÔNG trả chuỗi lỗi ra cho người dùng.
 """
-import json, urllib.request, re, time, os, hashlib, unicodedata
+import json
+import urllib.request
+import re
+import time
+import os
+import hashlib
+import unicodedata
 from pathlib import Path
 from prompts_vi import system_for, language_name, normalize_language
+
+# Logging có cấu trúc (tái dùng cơ chế của security-hardening)
+try:
+    from logging_utils import get_logger
+    logger = get_logger("clara_brain")
+except Exception:
+    import logging
+    logger = logging.getLogger("clara_brain")
 
 DEFAULT_OLLAMA = "qwen2.5:1.5b"
 CANDIDATE_MODELS = [
@@ -438,23 +454,32 @@ class Brain:
                                            num_predict=kw.get("num_predict", 400),
                                            options=self._ollama_options(t, kw.get("num_predict", 400))) or ""
             except TypeError:
-                out = ollama_chat_messages(messages, model=self.model, temperature=t,
-                                           num_predict=kw.get("num_predict", 400)) or ""
-            except Exception:
+                try:
+                    out = ollama_chat_messages(messages, model=self.model, temperature=t,
+                                               num_predict=kw.get("num_predict", 400)) or ""
+                except Exception as e:
+                    logger.warning("ollama_chat_messages thất bại: %s", e)
+                    out = ""
+            except Exception as e:
+                logger.warning("ollama_chat_messages thất bại: %s", e)
                 out = ""
             if not out:
                 try:
                     out = ollama_chat(f"{sys_prompt}\n{prompt}", model=self.model, temperature=t,
                                       num_predict=kw.get("num_predict", 400))
                 except Exception as e:
-                    out = f"[ollama lỗi: {e}]\n"
+                    # Lỗi THẬT ở backend chính -> ghi log, KHÔNG trả lỗi ra user.
+                    logger.error("ollama_chat thất bại, fallback về micro: %s", e)
+                    out = ""
         elif self.backend == "openai":
             full = f"{sys_prompt}\n{prompt}"
             try:
                 out = openai_chat(full, model=self.model, temperature=t,
                                   num_predict=kw.get("num_predict", 400))
             except Exception as e:
-                out = f"[openai lỗi: {e}]\n"
+                # Lỗi THẬT -> ghi log, KHÔNG trả lỗi ra user (luôn fallback micro bên dưới).
+                logger.error("openai_chat thất bại, fallback về micro: %s", e)
+                out = ""
         else:
             out = ""
         out = strip_think(out)

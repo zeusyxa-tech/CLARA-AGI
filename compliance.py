@@ -7,6 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 OWNER_POLICY_PATH = ROOT / "owner_policy.json"
+# PII thật (họ tên, ngày sinh, nơi sinh) tách ra file local, KHÔNG commit (đã .gitignore).
+OWNER_IDENTITY_LOCAL_PATH = ROOT / "owner_identity.local.json"
 
 
 def _load_json(path: Path) -> dict:
@@ -17,7 +19,19 @@ def _load_json(path: Path) -> dict:
 
 
 def load_owner_policy() -> dict:
-    return _load_json(OWNER_POLICY_PATH)
+    """Đọc owner_policy.json (đã ẩn danh) và trộn PII local nếu có.
+
+    owner_policy.json committed chỉ giữ id ẩn danh; PII thật nằm trong
+    owner_identity.local.json (gitignored). Khi chạy trên máy chủ dự án, PII
+    được trộn vào để agent nhận diện owner, nhưng KHÔNG bao giờ đi kèm commit.
+    """
+    policy = _load_json(OWNER_POLICY_PATH)
+    local = _load_json(OWNER_IDENTITY_LOCAL_PATH)
+    if local:
+        owner = dict(policy.get("owner", {}))
+        owner.update(local.get("owner", local))
+        policy["owner"] = owner
+    return policy
 
 
 def is_owner_locked(owner_policy: dict) -> bool:
