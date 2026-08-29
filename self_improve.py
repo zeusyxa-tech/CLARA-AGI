@@ -1,28 +1,22 @@
 """
-CLARA-AGI v1.4 - Self-Improvement: web research, skill proposal, auto-approval.
+CLARA-AGI v1.3 - Self-Improvement: web research, skill proposal, auto-approval.
 """
-import os
-import re
-import json
-import time
-import ast
+import ast, os, re, json, time
 from pathlib import Path
 from web_tools import web_search, web_fetch
-from config import get_config
-
-_self_improve_cfg = get_config("self_improve")
 
 CUSTOM_SKILLS_DIR = Path(__file__).parent / "skills_custom"
 CUSTOM_SKILLS_DIR.mkdir(exist_ok=True)
-ACTIVE_DIR = CUSTOM_SKILLS_DIR / "active"
+ACTIVE_DIR = CUSTOM_SKILLS_DIR / "_quarantine"
 ACTIVE_DIR.mkdir(exist_ok=True)
 PENDING_DIR = CUSTOM_SKILLS_DIR / "_pending"
 PENDING_DIR.mkdir(exist_ok=True)
 
-MAX_PAGES_DEFAULT = _self_improve_cfg.get("max_pages_research", 3)
-MAX_FACTS_PER_PAGE = _self_improve_cfg.get("max_facts_per_page", 5)
-MIN_CONFIDENCE = _self_improve_cfg.get("min_confidence", 0.5)
-DEDUP_SIMILARITY_THRESHOLD = _self_improve_cfg.get("dedup_threshold", 0.85)
+MAX_PAGES_DEFAULT = 3
+MAX_FACTS_PER_PAGE = 5
+MIN_CONFIDENCE = 0.5
+WEB_CONFIDENCE_CAP = 0.5
+DEDUP_SIMILARITY_THRESHOLD = 0.85
 
 
 # ---------- Knowledge helpers ----------
@@ -42,50 +36,6 @@ def _dedup(agi, new_facts):
         if best < DEDUP_SIMILARITY_THRESHOLD:
             out.append(f)
     return out
-
-
-# ---------- AST Validation for Skills (same as tools.py sandbox) ----------
-_SAFE_IMPORTS = {"math", "random", "statistics", "datetime", "collections",
-                 "itertools", "functools", "re", "json", "string", "time",
-                 "pathlib", "os.path", "urllib.parse", "urllib.request"}
-
-_BLOCKED_ATTR = {"__import__", "__subclasses__", "__class__", "__bases__",
-                 "__mro__", "__globals__", "__code__", "__func__", "__self__",
-                 "eval", "exec", "compile", "open", "input", "breakpoint",
-                 "__builtins__", "globals", "locals", "getattr"}
-
-_BLOCKED_NAMES = {"open", "eval", "exec", "compile", "__import__",
-                  "globals", "locals", "breakpoint", "input", "exit", "quit"}
-
-
-def _validate_skill_ast(code: str) -> bool:
-    """Validate skill code AST for safety - similar to tools.py sandbox."""
-    try:
-        tree = ast.parse(code)
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                if isinstance(node, ast.ImportFrom):
-                    if node.module and node.module.split(".")[0] not in _SAFE_IMPORTS:
-                        return False
-                else:
-                    for n in node.names:
-                        if n.name.split(".")[0] not in _SAFE_IMPORTS:
-                            return False
-            if isinstance(node, ast.Attribute):
-                if node.attr in _BLOCKED_ATTR:
-                    return False
-            if isinstance(node, ast.Name):
-                if node.id in _BLOCKED_NAMES:
-                    return False
-            if isinstance(node, ast.Call):
-                # Block dangerous function calls
-                if isinstance(node.func, ast.Name) and node.func.id in _BLOCKED_NAMES:
-                    return False
-                if isinstance(node.func, ast.Attribute) and node.func.attr in _BLOCKED_ATTR:
-                    return False
-        return True
-    except SyntaxError:
-        return False
 
 
 # ---------- Web research ----------
@@ -145,7 +95,8 @@ def research(agi, topic: str, max_pages: int = MAX_PAGES_DEFAULT) -> str:
 
     for fact_text, url in deduped:
         if len(fact_text) > 15 and url:
-            agi.mem.learn(f"web:{_normalize(topic)[:25]}", fact_text, confidence=MIN_CONFIDENCE, source=f"web:{url}")
+            confidence = min(WEB_CONFIDENCE_CAP, MIN_CONFIDENCE)
+            agi.mem.learn(f"web:{_normalize(topic)[:25]}", fact_text, confidence=confidence, source=f"web:{url}")
             learned += 1
 
     agi.mem.remember_episode("research",
@@ -164,15 +115,38 @@ Auto-generated skill: {name}
 Mô tả: {description}
 Tạo bởi: CLARA self-improvement
 Ngày tạo: {date}
-
 """
 {code}
 '''
 
+BLOCKED_PATTERNS = [
+    "os.system", "subprocess", "shutil.rmtree", "__import__('os')",
+    "eval(", "exec(", "open(", "requests.post", "requests.get", "urllib",
+    "socket.", "http.client", "ftplib", "telnetlib", "xmlrpc",
+    "pickle.loads", "yaml.load(", "tempfile.mktemp", "globals()", "locals()",
+]
+
 
 def _safe_code(code: str) -> bool:
-    """Validate skill code using AST validation."""
-    return _validate_skill_ast(code)
+    try:
+        tree = ast.parse(code)
+    except Exception:
+        return False
+    ALLOW_IMPORTS = {"math", "json", "re", "datetime", "collections", "itertools", "functools", "statistics", "string", "time"}
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.Import, ast.ImportFrom)):
+            mod = getattr(n, "module", None) or ""
+            top = mod.split(".")[0] if mod else ""
+            names = [getattr(alias, "name", "").split(".")[0] for alias in getattr(n, "names", [])]
+            if top and top not in ALLOW_IMPORTS:
+                return False
+            if any(name and name not in ALLOW_IMPORTS for name in names):
+                return False
+        if isinstance(n, ast.Attribute) and n.attr.startswith("__"):
+            return False
+        if isinstance(n, ast.Name) and n.id in {"eval", "exec", "compile", "open", "os", "sys", "subprocess", "socket", "urllib", "importlib", "shutil", "pickle", "globals", "locals", "getattr", "setattr", "vars", "input", "__import__"}:
+            return False
+    return True
 
 
 def propose_skill(agi, topic_or_problem: str) -> dict:
@@ -213,7 +187,7 @@ def propose_skill(agi, topic_or_problem: str) -> dict:
     code = re.sub(r"^```(?:python)?\s*", "", code)
     code = re.sub(r"\s*```$", "", code)
     if not _safe_code(code):
-        return {"ok": False, "error": "Code chứa mẫu không an toàn (AST validation failed).", "raw": code}
+        return {"ok": False, "error": "Code chứa mẫu không an toàn.", "raw": code}
 
     filename = f"{int(time.time())}_{name}"
     path = PENDING_DIR / filename
@@ -345,9 +319,9 @@ def _register_custom_tool(agi, name, module):
     tool_name = f"custom_{name}"
     if tool_name in TOOLS:
         return
-    def _fn(arg):
+    def _fn(agent, arg):
         try:
-            return module.run(agi, arg)
+            return module.run(agent, arg)
         except Exception as e:
             return f"❌ Lỗi skill {name}: {e}"
     TOOLS[tool_name] = {"fn": _fn, "needs_agent": True, "desc": f"Skill tự tạo: {name}"}
@@ -362,8 +336,7 @@ def improve(agi, topic: str) -> str:
         out.append(f"🛠️ Đã đề xuất skill mới: {prop['name']}")
         out.append(f"   Mô tả: {prop['description']}")
         out.append(f"   File chờ duyệt: {prop['path']}")
-        out.append("")
-        out.append(f"Để kích hoạt: gõ `approve {prop['name']}`")
+        out.append(f"\nĐể kích hoạt: gõ `approve {prop['name']}`")
         out.append(f"Để từ chối:    gõ `reject {prop['name']}`")
     else:
         out.append(f"⚠️ Không tự tạo được skill: {prop.get('error','')}")

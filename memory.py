@@ -4,21 +4,15 @@ Không cần thư viện ngoài — dùng sqlite3 (Python mặc định).
 """
 import sqlite3, time, json, math, hashlib, os, unicodedata, re
 from pathlib import Path
-from config import get_config
 
-# Try to import sklearn for TF-IDF caching (optional - fallback to keyword scoring)
 try:
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
-    import numpy as np
-    _HAS_SKLEARN = True
-except ImportError:
-    _HAS_SKLEARN = False
+    from version import __version__ as _VERSION
+except Exception:
+    _VERSION = "1.4"
 
-_memory_cfg = get_config("memory")
-DB_DIR = Path(_memory_cfg.get("db_dir", "data"))
+DB_DIR = Path(os.environ.get("CLARA_DB_DIR", "")) if os.environ.get("CLARA_DB_DIR") else Path(__file__).parent / "data"
 DB_DIR.mkdir(exist_ok=True)
-DB_PATH = Path(_memory_cfg.get("db_name", "clara.db"))
+DB_PATH = Path(os.environ.get("CLARA_DB_PATH", "")) if os.environ.get("CLARA_DB_PATH") else DB_DIR / "clara.db"
 WS_DIR = Path(__file__).parent / "workspace"
 WS_DIR.mkdir(exist_ok=True)
 
@@ -39,7 +33,9 @@ def now(): return time.time()
 
 
 class Memory:
-    def __init__(self, db_path=DB_PATH):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            db_path = Path(os.environ.get("CLARA_DB_PATH", "")) if os.environ.get("CLARA_DB_PATH") else DB_DIR / "clara.db"
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5.0)
         self.conn.row_factory = sqlite3.Row
         try:
@@ -47,13 +43,6 @@ class Memory:
             self.conn.execute("PRAGMA synchronous=NORMAL;")
         except Exception:
             pass
-        # TF-IDF cache for semantic recall
-        self._tfidf_vectorizer = None
-        self._tfidf_matrix = None
-        self._tfidf_facts = []  # list of (topic, fact) for matrix rows
-        self._tfidf_dirty = True  # flag to indicate cache needs rebuild
-        self._max_semantics_recall = _memory_cfg.get("max_semantics_recall", 500)
-        self._min_confidence = _memory_cfg.get("min_confidence", 0.2)
         self._schema()
         self._seed()
 
@@ -72,7 +61,8 @@ class Memory:
             confidence REAL DEFAULT 0.5,
             access_count INTEGER DEFAULT 0,
             last_access REAL,
-            source TEXT DEFAULT 'learned'
+            source TEXT DEFAULT 'learned',
+            language TEXT DEFAULT 'vi'
         );
         CREATE TABLE IF NOT EXISTS procedures(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,15 +108,40 @@ class Memory:
             vector TEXT,
             ts REAL
         );
+        CREATE TABLE IF NOT EXISTS candidate_memory(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic TEXT,
+            fact TEXT,
+            confidence REAL DEFAULT 0.5,
+            source TEXT DEFAULT 'candidate',
+            captured_at REAL,
+            status TEXT DEFAULT 'pending',
+            reason TEXT
+        );
         CREATE INDEX IF NOT EXISTS ep_ts ON episodes(ts);
         CREATE INDEX IF NOT EXISTS ep_kind ON episodes(kind);
         CREATE INDEX IF NOT EXISTS sem_topic ON semantics(topic);
         CREATE INDEX IF NOT EXISTS goals_status ON goals(status);
+        CREATE INDEX IF NOT EXISTS cand_status ON candidate_memory(status);
+        CREATE TABLE IF NOT EXISTS audit(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts REAL,
+            action TEXT,
+            topic TEXT,
+            fact TEXT,
+            source TEXT,
+            confidence REAL,
+            detail TEXT
+        );
         """
         self.conn.executescript(ddl)
         try:
             self.conn.execute("ALTER TABLE semantics ADD COLUMN fingerprint TEXT")
             self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS sem_fingerprint ON semantics(fingerprint)")
+        except Exception:
+            pass
+        try:
+            self.conn.execute("ALTER TABLE semantics ADD COLUMN language TEXT DEFAULT 'vi'")
         except Exception:
             pass
 
@@ -183,7 +198,24 @@ class Memory:
                 self.add_goal(g, p, d)
         self.set_trait("born_at", self.get_trait("born_at", now()))
         self.set_trait("name", "CLARA")
-        self.set_trait("version", "1.2")
+        self.set_trait("version", _VERSION)
+
+    def _append_audit(self, action, topic, fact, source, confidence, detail=None):
+        try:
+            self.conn.execute(
+                "INSERT INTO audit(ts,action,topic,fact,source,confidence,detail) VALUES(?,?,?,?,?,?,?)",
+                (now(), action, topic, fact, source, confidence, detail),
+            )
+            self.conn.commit()
+        except Exception:
+            pass
+        try:
+            p = DB_DIR / "audit.jsonl"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with p.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"action": action, "topic": topic, "fact": fact, "source": source, "confidence": confidence, "detail": detail, "ts": now()}, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     # ---------------- RESEARCH + TOPIC DEDUP ----------------
     def log_research(self, topic, source="web", result_summary="", usefulness=0.5, harm=False):
@@ -263,11 +295,12 @@ class Memory:
         return [r for _, r in scored[:limit]]
 
     # ---------------- SEMANTICS ----------------
-    def learn(self, topic, fact, confidence=0.6, source="learned"):
+    def learn(self, topic, fact, confidence=0.6, source="learned", language=None):
         fact = fact.strip()
         if not fact: return
         c = self.conn.cursor()
         old = c.execute("SELECT id, confidence, access_count, source, ts FROM semantics WHERE fact=?", (fact,)).fetchone()
+        lang = language or self._detect_language(fact) or "vi"
         if old:
             boost = 0.05
             raw_src = (old["source"] or "")
@@ -283,104 +316,57 @@ class Memory:
                 c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=? WHERE id=?",
                           (boosted, old["access_count"]+1, now(), old["id"]))
                 self.conn.commit()
+                self._append_audit("learn", topic, fact, source, confidence)
                 return old["id"]
             nc = min(1.0, max(old["confidence"], confidence) + boost)
-            c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=?, source=? WHERE id=?",
-                      (nc, old["access_count"]+1, now(), source, old["id"]))
+            c.execute("UPDATE semantics SET confidence=?, access_count=?, last_access=?, source=?, language=? WHERE id=?",
+                      (nc, old["access_count"]+1, now(), source, lang, old["id"]))
             self.conn.commit()
+            self._append_audit("learn", topic, fact, source, confidence)
             return old["id"]
-        c.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source) VALUES(?,?,?,?,?,?)",
-                  (now(), topic.strip() if topic else "general", fact, confidence, now(), source))
+        c.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source,language) VALUES(?,?,?,?,?,?,?)",
+                  (now(), topic.strip() if topic else "general", fact, confidence, now(), source, lang))
         self.conn.commit()
+        self._append_audit("learn", topic, fact, source, confidence)
         return c.lastrowid
 
     def forget(self, fact_id):
         self.conn.execute("DELETE FROM semantics WHERE id=?", (fact_id,))
         self.conn.commit()
-        self._tfidf_dirty = True  # Invalidate cache
-
-    def _rebuild_tfidf_cache(self):
-        """Rebuild TF-IDF vectorizer and matrix from current semantics."""
-        if not _HAS_SKLEARN:
-            return
-        c = self.conn.cursor()
-        rows = c.execute(
-            "SELECT topic, fact FROM semantics WHERE confidence>=? ORDER BY last_access DESC LIMIT ?",
-            (self._min_confidence, self._max_semantics_recall)
-        ).fetchall()
-        if not rows:
-            self._tfidf_vectorizer = None
-            self._tfidf_matrix = None
-            self._tfidf_facts = []
-            return
-        self._tfidf_facts = [(r["topic"], r["fact"]) for r in rows]
-        corpus = [topic + " " + fact for topic, fact in self._tfidf_facts]
-        # Use HashingVectorizer for memory efficiency if many docs, else TfidfVectorizer
-        if len(corpus) > 5000:
-            from sklearn.feature_extraction.text import HashingVectorizer
-            self._tfidf_vectorizer = HashingVectorizer(
-                n_features=2**16,
-                alternate_sign=False,
-                norm='l2',
-                lowercase=True,
-                ngram_range=(1, 2)
-            )
-            self._tfidf_matrix = self._tfidf_vectorizer.transform(corpus)
-        else:
-            self._tfidf_vectorizer = TfidfVectorizer(
-                lowercase=True,
-                ngram_range=(1, 2),
-                max_features=10000,
-                min_df=1,
-                max_df=0.95
-            )
-            self._tfidf_matrix = self._tfidf_vectorizer.fit_transform(corpus)
-        self._tfidf_dirty = False
-
-    def _get_tfidf_scores(self, query: str):
-        """Get TF-IDF cosine similarity scores for query against cached matrix."""
-        if self._tfidf_dirty or self._tfidf_vectorizer is None or self._tfidf_matrix is None:
-            self._rebuild_tfidf_cache()
-        if self._tfidf_vectorizer is None or self._tfidf_matrix is None:
-            return None
-        try:
-            q_vec = self._tfidf_vectorizer.transform([query])
-            scores = cosine_similarity(q_vec, self._tfidf_matrix).flatten()
-            return scores
-        except Exception:
-            return None
 
     def recall_semantics(self, query, limit=5, min_conf=0.2):
         c = self.conn.cursor()
-        rows = c.execute(
-            "SELECT * FROM semantics WHERE confidence>=? ORDER BY last_access DESC LIMIT ?",
-            (min_conf, self._max_semantics_recall)
-        ).fetchall()
+        rows = c.execute("SELECT * FROM semantics WHERE confidence>=? ORDER BY last_access DESC LIMIT 500",
+                         (min_conf,)).fetchall()
         qw = set(self._tok(query))
         scored = []
-        
-        # Try TF-IDF scores if sklearn available
-        tfidf_scores = self._get_tfidf_scores(query)
-        
         try:
             qvec = _embed(query)
         except Exception:
             qvec = None
-        
-        for idx, r in enumerate(rows):
+        for r in rows:
             rw = set(self._tok(r["topic"] + " " + r["fact"]))
             overlap = len(qw & rw)
-            if overlap == 0 and qvec is None and tfidf_scores is None:
+            if overlap == 0 and qvec is None:
+                q_ascii = self._normalize_ascii(query)
+                r_ascii = self._normalize_ascii(r["topic"] + " " + r["fact"])
+                if q_ascii and r_ascii:
+                    qw_ascii = set(self._tok(q_ascii))
+                    rw_ascii = set(self._tok(r_ascii))
+                    overlap = len(qw_ascii & rw_ascii)
+            if overlap == 0 and qvec is None:
                 continue
-            common = qw & rw
+            if qvec is not None and overlap == 0:
+                common = set()
+            elif qw and rw:
+                common = qw & rw
+            else:
+                common = set()
+            if overlap and not common:
+                common = set(self._tok(query)) & set(self._tok(r["topic"] + " " + r["fact"]))
             has_bigram = any("_" in tok for tok in common)
             kw_score = self._score_match(overlap, has_bigram) * r["confidence"] * (1 + math.log1p(r["access_count"]))
-            
-            # Add TF-IDF score if available
-            if tfidf_scores is not None and idx < len(tfidf_scores):
-                tfidf_score = tfidf_scores[idx]
-                kw_score = 0.5 * kw_score + 0.5 * (1 + tfidf_score)  # combine with keyword score
-            elif qvec is not None:
+            if qvec is not None:
                 rvec = _embed(r["topic"] + " " + r["fact"])
                 if rvec is not None:
                     kw_score = 0.55 * kw_score + 0.45 * (1 + cosine(qvec, rvec))
@@ -439,21 +425,12 @@ class Memory:
 
     def update_goal(self, gid, status=None, progress=None, priority=None):
         sets, vals = [], []
-        if status:
-            sets.append("status=?")
-            vals.append(status)
-        if progress:
-            sets.append("progress=?")
-            vals.append(progress)
-        if priority is not None:
-            sets.append("priority=?")
-            vals.append(priority)
-        if not sets:
-            return
-        # Build query safely - sets contains only fixed column names
-        query = "UPDATE goals SET " + ", ".join(sets) + " WHERE id=?"
+        if status: sets.append("status=?"); vals.append(status)
+        if progress: sets.append("progress=?"); vals.append(progress)
+        if priority is not None: sets.append("priority=?"); vals.append(priority)
+        if not sets: return
         vals.append(gid)
-        self.conn.execute(query, vals)
+        self.conn.execute(f"UPDATE goals SET {', '.join(sets)} WHERE id=?", vals)
         self.conn.commit()
 
     def complete_goal(self, gid, note="done"):
@@ -492,65 +469,6 @@ class Memory:
     def all_user(self):
         return [dict(r) for r in self.conn.execute("SELECT * FROM user_model").fetchall()]
 
-    # ---------------- FEEDBACK LEARNING (học từ feedback) ----------------
-    def feedback_learn(self, correction: str, positive: bool = False):
-        """
-        Học từ feedback của người dùng để CLARA thông minh hơn theo thời gian.
-        - positive=True : ghi nhận cách trả lời được khen -> củng cố.
-        - positive=False: ghi nhận phần sửa (correction) -> học cách đúng,
-          đồng thời hạ confidence của các fact mâu thuẫn để tránh lặp lại sai.
-        """
-        correction = (correction or "").strip()
-        if not correction:
-            return
-        if positive:
-            self.learn("feedback_ok", correction, confidence=0.85, source="user_feedback")
-            return
-        # negative feedback: lưu cách sửa đúng
-        self.learn("correction", correction, confidence=0.92, source="user_feedback")
-        # hạ confidence các fact mâu thuẫn (có từ khóa trùng với correction)
-        qw = set(self._tok(correction))
-        if qw:
-            rows = self.conn.execute(
-                "SELECT id, fact, confidence FROM semantics WHERE confidence>=0.3"
-            ).fetchall()
-            for r in rows:
-                rw = set(self._tok(r["fact"]))
-                if len(qw & rw) >= 2 and r["confidence"] > 0.35:
-                    new_c = max(0.2, r["confidence"] - 0.15)
-                    self.conn.execute(
-                        "UPDATE semantics SET confidence=? WHERE id=?", (new_c, r["id"])
-                    )
-            self.conn.commit()
-
-    # ---------------- CONSOLIDATE (gom nhớ định kỳ) ----------------
-    def consolidate_memory(self, limit=200):
-        """
-        Gom nhớ: gộp các fact trùng lặp (theo normalized text), giữ confidence cao nhất,
-        xóa bản sao. Trả về số fact bị gộp. Càng chạy thường xuyên bộ nhớ càng sạch.
-        """
-        rows = self.conn.execute(
-            "SELECT id, fact, confidence, source FROM semantics ORDER BY confidence DESC LIMIT ?",
-            (limit,)
-        ).fetchall()
-        seen = {}
-        removed = 0
-        for r in rows:
-            key = self._normalize(r["fact"])
-            if not key:
-                continue
-            if key in seen:
-                # xóa bản trùng, giữ bản có confidence cao hơn
-                dup_id = r["id"]
-                self.conn.execute("DELETE FROM semantics WHERE id=?", (dup_id,))
-                removed += 1
-            else:
-                seen[key] = r["id"]
-        if removed:
-            self.conn.commit()
-            self._tfidf_dirty = True
-        return removed
-
     # ---------------- DREAMS ----------------
     def add_dream(self, summary, lessons):
         self.conn.execute("INSERT INTO dreams(ts,summary,lessons) VALUES(?,?,?)",
@@ -563,7 +481,7 @@ class Memory:
     # ---------------- STATS / EXPORT ----------------
     def stats(self):
         c = self.conn.cursor()
-        return {
+        out = {
             "episodes": c.execute("SELECT COUNT(*) FROM episodes").fetchone()[0],
             "semantics": c.execute("SELECT COUNT(*) FROM semantics").fetchone()[0],
             "procedures": c.execute("SELECT COUNT(*) FROM procedures").fetchone()[0],
@@ -572,7 +490,10 @@ class Memory:
             "done_goals": c.execute("SELECT COUNT(*) FROM goals WHERE status='done'").fetchone()[0],
             "dreams": c.execute("SELECT COUNT(*) FROM dreams").fetchone()[0],
             "user_model_entries": c.execute("SELECT COUNT(*) FROM user_model").fetchone()[0],
+            "candidates_pending": c.execute("SELECT COUNT(*) FROM candidate_memory WHERE status='pending'").fetchone()[0],
+            "candidates_trusted": c.execute("SELECT COUNT(*) FROM candidate_memory WHERE status='trusted'").fetchone()[0],
         }
+        return out
 
     def export_knowledge(self, path):
         out = {
@@ -581,12 +502,65 @@ class Memory:
             "goals": [dict(r) for r in self.conn.execute("SELECT * FROM goals").fetchall()],
             "user_model": self.all_user(),
             "traits": {k: self.get_trait(k) for k in [r[0] for r in self.conn.execute("SELECT k FROM traits").fetchall()]},
+            "candidate_memory": [dict(r) for r in self.conn.execute("SELECT * FROM candidate_memory").fetchall()],
             "exported_at": now(),
         }
         Path(path).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
         return out
 
+    # ---------------- CANDIDATE MEMORY ----------------
+    def add_candidate(self, topic, fact, source="candidate", confidence=0.5, reason="idle candidate"):
+        self.conn.execute(
+            "INSERT INTO candidate_memory(topic,fact,confidence,source,captured_at,status,reason) VALUES(?,?,?,?,?,?,?)",
+            (topic, fact, confidence, source, now(), "pending", reason),
+        )
+        self.conn.commit()
+
+    def review_candidates(self, limit=20):
+        rows = [dict(r) for r in self.conn.execute(
+            "SELECT * FROM candidate_memory WHERE status='pending' ORDER BY captured_at DESC LIMIT ?", (limit,)
+        )]
+        return rows
+
+    def approve_candidate(self, cid):
+        r = self.conn.execute("SELECT * FROM candidate_memory WHERE id=?", (cid,)).fetchone()
+        if not r:
+            return None
+        fact = r["fact"]
+        old = self.conn.execute("SELECT id, confidence FROM semantics WHERE fact=?", (fact,)).fetchone()
+        if old:
+            self.conn.execute("UPDATE semantics SET confidence=min(1.0, confidence+0.05), last_access=? WHERE id=?", (now(), old["id"]))
+        else:
+            confidence = min(1.0, float(r["confidence"] or 0.5) + 0.1)
+            self.conn.execute("INSERT INTO semantics(ts,topic,fact,confidence,last_access,source) VALUES(?,?,?,?,?,?)",
+                               (now(), r["topic"], fact, confidence, now(), "user_approved"))
+        self.conn.execute("UPDATE candidate_memory SET status='trusted', reason='approved' WHERE id=?", (cid,))
+        self.conn.commit()
+        return True
+
+    def reject_candidate(self, cid):
+        r = self.conn.execute("SELECT * FROM candidate_memory WHERE id=?", (cid,)).fetchone()
+        if not r:
+            return None
+        self.conn.execute("UPDATE candidate_memory SET status='rejected', reason='rejected_by_user' WHERE id=?", (cid,))
+        self.conn.commit()
+        return True
+
     # ---------------- UTIL ----------------
+    def _detect_language(self, text: str) -> str | None:
+        if not text:
+            return None
+        ascii_text = text.encode("ascii", "ignore").decode("ascii")
+        if len(ascii_text) < len(text):
+            return "vi"
+        return None
+
+    @staticmethod
+    def _normalize_ascii(text: str) -> str:
+        nfkd = unicodedata.normalize("NFKD", text)
+        ascii_text = nfkd.encode("ascii", "ignore").decode("ascii")
+        return " ".join(ascii_text.split())
+
     def _normalize(self, s: str) -> str:
         s = unicodedata.normalize("NFC", s).lower()
         s = "".join(ch if unicodedata.category(ch)[0] not in "P" else " " for ch in s)

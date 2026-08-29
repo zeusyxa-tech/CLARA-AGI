@@ -47,24 +47,24 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:8px}
 </style></head><body>
 <header>
   <div class="dot" id="dot"></div>
-  <strong>🧬 CLARA-AGI v1.1</strong>
+  <strong>🧬 CLARA-AGI</strong>
   <span class="status" id="status">đang tải…</span>
 </header>
 <main>
   <div class="tools">
-    <span class="chip" onclick="send('commands')">/commands</span>
-    <span class="chip" onclick="send('status')">/status</span>
-    <span class="chip" onclick="send('dream')">/dream</span>
+    <span class="chip" onclick="send('commands')">/lệnh</span>
+    <span class="chip" onclick="send('status')">/trạng-thái</span>
+    <span class="chip" onclick="send('dream')">/ngủ-mơ</span>
     <span class="chip" onclick="send('bạn là ai')">bạn là ai?</span>
     <span class="chip" onclick="send('tính 15!')">tính 15!</span>
   </div>
   <div id="chat"></div>
   <form onsubmit="submitMsg(event)">
-    <textarea id="inp" placeholder="Nói gì đó với CLARA... (Enter gửi, Shift+Enter xuống dòng)" autofocus></textarea>
+    <textarea id="inp" placeholder="Nhắn gì đó với CLARA... (Enter gửi, Shift+Enter xuống dòng)" autofocus></textarea>
     <button id="btn">Gửi</button>
   </form>
 </main>
-<footer>Local-only · không gửi dữ liệu đi đâu · 100% chạy trên máy bạn</footer>
+<footer>Chỉ chạy nội bộ · không gửi dữ liệu ra ngoài · 100% trên máy bạn</footer>
 <script>
 const chat=document.getElementById('chat');
 const inp=document.getElementById('inp');
@@ -107,7 +107,7 @@ async function refreshStatus(){
 function updateStatus(s){
   if(!s)return;
   const m=s.memory||{};
-  stat.textContent=`🧠 ${s.brain?.backend||''} · 💾 ${m.episodes||0}ep / ${m.semantics||0}facts / ${m.procedures||0}procs · ${s.turns||0} turns · ${s.age_hours||0}h`;
+  stat.textContent=`🧠 ${s.brain?.backend||''} · 💾 ${m.episodes||0}ep / ${m.semantics||0}facts / ${m.procedures||0}procs · ${s.turns||0} lượt · ${s.age_hours||0}h`;
 }
 inp.addEventListener('keydown',e=>{
   if(e.key==='Enter' && !e.shiftKey){e.preventDefault();submitMsg(e)}
@@ -123,20 +123,45 @@ def create_app(agi):
         raise ImportError("Chưa cài flask. Hãy chạy: pip install flask")
     app = Flask(__name__)
 
-    @app.route("/")
-    def index():
+    @app.route("/", defaults={"path": ""})
+    def index(path):
         return render_template_string(INDEX_HTML)
+
+    @app.errorhandler(404)
+    def not_found(_):
+        return render_template_string(INDEX_HTML), 200
 
     @app.route("/chat", methods=["POST"])
     def chat_route():
-        data = request.get_json(force=True) or {}
+        ct = request.content_type or ""
+        if "application/json" not in ct:
+            return jsonify({"error": "Yêu cầu Content-Type: application/json"}), 415
+        origin = request.headers.get("Origin") or request.headers.get("Referer") or ""
+        if origin:
+            try:
+                from urllib.parse import urlparse
+                p = urlparse(origin)
+                if p.scheme not in ("http", "https"):
+                    raise ValueError("unsupported scheme")
+                expected_host = request.host.split(":")[0]
+                expected_port = request.host.split(":")[1] if ":" in request.host else ("443" if p.scheme == "https" else "80")
+                if p.hostname != expected_host or str(p.port or ("443" if p.scheme == "https" else "80")) != expected_port:
+                    return jsonify({"error": "Origin không được phép"}), 403
+            except Exception:
+                return jsonify({"error": "Origin không hợp lệ"}), 403
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Body không phải JSON hợp lệ"}), 400
         msg = (data.get("msg") or "").strip()
         t0 = time.time()
         reply = agi.chat(msg)
         elapsed = int((time.time() - t0) * 1000)
-        return jsonify({"reply": reply, "elapsed_ms": elapsed,
+        resp = jsonify({"reply": reply, "elapsed_ms": elapsed,
                         "backend": agi.brain.status()["backend"],
                         "status": agi.status()})
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     @app.route("/status")
     def status_route():
@@ -144,9 +169,11 @@ def create_app(agi):
 
     # tự mở trình duyệt
     import threading, webbrowser
+    host = (app.config.get("SERVER_NAME") or "").split(":")[0] or "127.0.0.1"
+    port = (app.config.get("SERVER_NAME") or "").split(":")[1] if ":" in (app.config.get("SERVER_NAME") or "") else "5000"
     def _open():
         import time as _t; _t.sleep(1.0)
-        try: webbrowser.open("http://127.0.0.1:5000/")
+        try: webbrowser.open(f"http://{host}:{port}/")
         except Exception: pass
     threading.Thread(target=_open, daemon=True).start()
 

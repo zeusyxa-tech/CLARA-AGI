@@ -3,7 +3,7 @@ CLARA-AGI Voice mode — nói vào micro, nghe CLARA đáp lại qua loa.
 PHỤ THUỘC TÙY CHỌN (không cài thì CLARA vẫn chạy CLI/Web bình thường):
   pip install openai-whisper piper-tts sounddevice soundfile numpy pyaudio
 
-Nếu không cù đủ thư viện, bạn có thể dùng chế độ fallback:
+Nếu không đủ thư viện, bạn có thể dùng chế độ fallback:
   - STT fallback: dùng SpeechRecognition + Google (online, free, nhẹ)
   - TTS fallback: dùng pyttsx3 (offline, giọng máy mặc định)
 """
@@ -64,6 +64,8 @@ class VoiceCLARA:
             print("   pip install SpeechRecognition pyaudio pyttsx3")
             print("   (hoặc tốt nhất: pip install openai-whisper piper-tts sounddevice soundfile)")
             sys.exit(1)
+        if self.stt_name == "google":
+            print("⚠️ STT fallback sẽ gửi âm thanh lên Google (online). Cài openai-whisper để chạy local.")
         print(f"   👂 STT: {self.stt_name}  ·  🗣️ TTS: {self.tts_name}")
         self._init_audio()
 
@@ -90,7 +92,7 @@ class VoiceCLARA:
         return (result.get("text") or "").strip()
 
     def _listen_google(self, timeout=8):
-        print("🎙️ Đang nghe (Google STT)...")
+        print("⚠️ STT fallback sẽ gửi âm thanh lên Google (online). Cài openai-whisper để chạy local.")
         with self.mic as source:
             try:
                 audio = self.stt.listen(source, timeout=timeout, phrase_time_limit=10)

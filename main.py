@@ -1,689 +1,110 @@
+#!/usr/bin/env python3
 """
-CLARA-AGI - Main CLI Entry Point
-Chạy agent, chế độ daemon, các lệnh quản lý (study, skill approval, status).
-Tích hợp logging có cấu trúc.
+CLARA-AGI v1.5 — CLI launcher.
+Chạy: python3 main.py [--micro] [--model <name>] [--web] [--voice] [--auto-learn] [--idle-study] [--allow-network] [--profile eco|mobile_12gb_safe|custom]
 """
-import sys
-import os
-import argparse
-import json
-import traceback
+import argparse, sys, os, json, time, random, threading, re
 from pathlib import Path
 
-# Setup logging FIRST
-import re
-import time
-from logging_utils import setup_logging, get_logger
+sys.path.insert(0, str(Path(__file__).parent))
 
-logger = setup_logging("clara_cli")
+from version import __version__
 
-from memory import Memory
-from brain import Brain
-from tools import parse_and_dispatch, TOOLS
-from config import get_config, config
+WELCOME = f"""
+╔═══════════════════════════════════════════════════════════════╗
+║   🧬  CLARA-AGI  v{__version__}  —  bounded continual-learning local agent      ║
+║     local-first · CPU-first · governed learning · safe defaults       ║
+╚═══════════════════════════════════════════════════════════════╝
+"""
 
-# Import optional modules gracefully
-try:
-    from scheduler import attach_study_commands, StudyScheduler
-    _HAS_SCHEDULER = True
-except Exception as e:
-    _HAS_SCHEDULER = False
-    logger.warning(f"Không tải được scheduler: {e}")
 
-try:
-    from self_improve import improve, list_pending, list_active, approve_skill, reject_skill
-    _HAS_SELF_IMPROVE = True
-except Exception as e:
-    _HAS_SELF_IMPROVE = False
-    logger.warning(f"Không tải được self_improve: {e}")
+def print_status(agi):
+    s = agi.status()
+    print(f"   🧠 Brain     : {s['brain']['backend']} — {s['brain']['model']}")
+    print(f"   🖥 Profile   : {s.get('runtime', {}).get('profile', '?')} | mode={s.get('runtime', {}).get('mode', '?')}")
+    rt = s.get("runtime", {})
+    if rt.get("degraded_reason"):
+        print(f"   ⚠️  Degraded : {rt['degraded_reason']}")
+    hw = rt.get("hardware", {})
+    if hw.get("ram_available_bytes") is not None:
+        print(f"   💾 RAM avail : {hw['ram_available_bytes']/1024/1024:.1f} MiB")
+    print(f"   📚 Memory    : {s['memory']['episodes']} episodes · "
+          f"{s['memory']['semantics']} facts · "
+          f"{s['memory']['procedures']} procedures (auto: {s['memory']['auto_procedures']})")
+    print(f"   🎯 Goals     : {s['memory']['active_goals']} active / {s['memory']['done_goals']} done")
+    print(f"   💭 Dreams    : {s['memory']['dreams']}")
+    print(f"   ⏱️ Age       : {s['age_hours']}h · {s['turns']} turns")
+    if s["brain"]["backend"] == "micro":
+        print()
+        print("💡 Chưa phát hiện Ollama. Tôi đang chạy 'micro brain' — đủ thể hiện kiến")
+        print("   trúc AGI nhưng trí tuệ hạn chế. Cách nâng cấp (chỉ làm 1 lần):")
+        print("     Windows: tải https://ollama.com/download, cài, mở app, rồi:")
+        print("              ollama pull qwen2.5:1.5b")
+        print("     Linux:   curl -fsSL https://ollama.com/install.sh | sh")
+        print("              (sau đó chạy 'ollama serve' trong terminal khác)")
+        print("              ollama pull qwen2.5:1.5b")
+        print("   Model cho máy rất yếu (4GB RAM): qwen2.5:0.5b (~350MB)")
+    print("-" * 63)
+    print(" Lệnh: commands · status · dream · autolearn on/off · goal X · export · quit")
+    print()
 
-try:
+
+def run_cli(args):
+    from agent import ClarasAGI
+    from web_tools import allow_network as _allow_network
+    _allow_network(args.allow_network)
+    import tools as _tools
+    _tools._set_dangerous_python(args.dangerous_python)
+    agi = ClarasAGI(force_micro=args.micro, model=args.model,
+                    dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                    language=args.language or os.environ.get("CLARA_LANGUAGE"))
+    print(WELCOME)
+    print_status(agi)
+
+    # Self-upgrade engine — TẮT mặc định; chỉ chạy khi có cờ --enable-self-upgrade.
+    # Mọi rào chắn (denylist, branch-per-edit, audit, test thật, giới hạn tần suất,
+    # lớn-patch cần xác nhận) đã nằm trong self_upgrade.py (Bước 3).
+    if getattr(args, "enable_self_upgrade", False):
+        try:
+            from self_upgrade import SelfUpgradeLoop
+            loop = SelfUpgradeLoop(agi, interval=args.self_upgrade_interval, verbose=True)
+            loop.start()
+            print(f"🔧 Self-upgrade engine ĐÃ BẬT (mỗi {args.self_upgrade_interval}s, cần cờ --enable-self-upgrade).")
+        except Exception as e:
+            print(f"⚠️ Không khởi được self-upgrade engine: {e}")
+    else:
+        print("🔒 Self-upgrade engine TẮT (mặc định an toàn). Dùng --enable-self-upgrade để bật.")
+    print()
+
+    # Auto-learn (tự học khi treo máy)
     from autolearn import AutoLearner
-    _HAS_AUTOLearn = True
-except Exception as e:
-    _HAS_AUTOLearn = False
-    logger.warning(f"Không tải được autolearn: {e}")
+    auto = AutoLearner(agi, interval=args.idle_interval, verbose=True)
+    if args.auto_learn:
+        auto.start()
+        print(f"💤 Chế độ TỰ HỌC KHI RẢNH đã BẬT (mỗi {args.idle_interval}s, dùng CPU thấp).")
+        print("   Gõ 'autolearn off' để tắt, 'autolearn status' để xem tiến độ.")
+        print()
 
-try:
-    from self_upgrade import propose_upgrade, scan_for_issues, list_backups, rollback as upgrade_rollback, SelfUpgradeLoop
-    _HAS_SELF_UPGRADE = True
-except Exception as e:
-    _HAS_SELF_UPGRADE = False
-    logger.warning(f"Không tải được self_upgrade: {e}")
-
-
-class ClarasAGI:
-    """Main agent class - giữ nguyên logic cũ nhưng dùng config mới."""
-
-    def __init__(self, force_micro=False, model=None, dream_every=10, auto_skill=True):
-        self.mem = Memory()
-        self.brain = Brain(force_micro=force_micro, model=model)
-        self.wm = []
-        self.dream_every = dream_every
-        self.auto_skill = auto_skill
-        self.turn_count = self.mem.get_trait("turn_count", 0) or 0
-        self.traits = {
-            "name": self.mem.get_trait("name", "CLARA"),
-            "version": self.mem.get_trait("version", "1.4"),
-            "born_at": float(self.mem.get_trait("born_at", time.time()) or time.time()),
-            "curiosity": self.mem.get_trait("curiosity", 0.7),
-            "honesty": self.mem.get_trait("honesty", 0.9),
-            "empathy": self.mem.get_trait("empathy", 0.6),
-            "verbosity": self.mem.get_trait("verbosity", 0.5),
-        }
-        self.first_run = self.mem.stats()["episodes"] == 0
-        self._study = None
-        self._command_registry = {}
-        self._init_command_registry()
-        self.history = []
-        if _HAS_SCHEDULER:
-            attach_study_commands(self)
-            self._study = StudyScheduler(self, enabled=True, interval=config.section("scheduler").get("interval_seconds", 120))
-            try:
-                self._study.start()
-            except Exception as e:
-                logger.error(f"Không thể khởi tạo StudyScheduler: {e}")
-                pass
-
-    def _init_command_registry(self):
-        """Register all command handlers."""
-        # Auto-register tools from tools.TOOLS
-        for tool_name, tool_def in TOOLS.items():
-            if tool_name not in self._command_registry:
-                self._command_registry[tool_name] = tool_def.get("fn", None)
-
-    def _compact_wm(self):
-        """Compact working memory to JSON-serializable form."""
-        compact = []
-        for entry in self.wm[-30:]:  # keep last 30 entries
-            compact.append(entry)
-        return compact
-
-    def _handle_special_commands(self, text: str) -> str:
-        """Xử lý các lệnh đặc biệt."""
-        text_lower = text.lower().strip()
-        
-        # Commands
-        if text_lower.startswith("/"):
-            cmd_parts = text[1:].split()
-            cmd = cmd_parts[0] if cmd_parts else ""
-            
-            if cmd == "status":
-                return self._cmd_status()
-            elif cmd == "approve" and len(cmd_parts) > 1:
-                return approve_skill(cmd_parts[1])
-            elif cmd == "reject" and len(cmd_parts) > 1:
-                return reject_skill(cmd_parts[1])
-            elif cmd == "skills":
-                return self._cmd_skills()
-            elif cmd == "clear":
-                self.wm = []
-                return "✅ Working memory cleared."
-            elif cmd == "help":
-                return self._cmd_help()
-        
-        return None
-
-    # ------------------ META COMMANDS (feedback / upgrade / consolidate) ------------------
-    def _handle_meta_commands(self, text: str):
-        low = text.lower().strip()
-        # Feedback học: "tốt/tệ vì <sửa>"
-        if low.startswith(("tốt", "hay", "tuyệt", "good", "great", "love")):
-            return self._feedback_command(text, positive=True)
-        if low.startswith(("tệ", "sai", "dốt", "chán", "bad", "kém", "ghét", "bực")):
-            return self._feedback_command(text, positive=False)
-        if low.startswith("feedback"):
-            return self._feedback_command(text, positive=None)
-        if low.startswith("upgrade") or low.startswith("tự nâng cấp"):
-            return self._upgrade_command(text)
-        if low.startswith("gomnhớ") or low.startswith("consolidate"):
-            return self._consolidate_command(text)
-        return None
-
-    def _feedback_command(self, text: str, positive=None):
-        """Học từ feedback của người dùng — CLARA thông minh hơn theo thời gian."""
-        low = text.lower().strip()
-        correction = re.sub(
-            r"^(tốt|tệ|sai|hay|good|bad|ok|đúng|cảm ơn|tuyệt|kém|ghét|bực|great|love|tuyệt vời|feedback)[\s:,.\\-\\>]*",
-            "", low, count=1).strip()
-        if positive is None:
-            # tự suy ra: có từ khen -> dương, có từ chê -> âm
-            if any(w in low for w in ["tốt", "hay", "đúng", "tuyệt", "great", "good", "love"]):
-                positive = True
-            elif any(w in low for w in ["tệ", "sai", "dốt", "chán", "bad", "kém", "ghét", "bực"]):
-                positive = False
-            else:
-                positive = True
-        if correction and positive is False:
-            self.mem.feedback_learn(correction, positive=False)
-            self.mem.remember_episode("correction", correction, importance=0.8, emotion=-0.4)
-            # hạ confidence episode sai gần nhất
-            last = self.mem.recall_episodes(kind="conversation", limit=1, recent_only=True)
-            if last:
-                self.mem.remember_episode("mistake", f"Sai: {last[0]['content'][:200]}", importance=0.9, emotion=-0.5)
-            return "✅ Cảm ơn, tôi đã ghi nhận cách sửa và sẽ tránh lặp lại."
-        if correction and positive is True:
-            self.mem.feedback_learn(correction, positive=True)
-            return "✅ Cảm ơn, tôi sẽ củng cố cách trả lời này."
-        if positive is True:
-            return "✅ Cảm ơn bạn! Tôi ghi nhận là làm tốt rồi."
-        return "Hãy nói rõ 'tốt' hoặc 'tệ vì <sửa lại>' để tôi học nhé."
-
-    def _upgrade_command(self, text: str):
-        if not _HAS_SELF_UPGRADE:
-            return "❌ Module self_upgrade không khả dụng."
-        arg = text.strip()
-        arg = re.sub(r"^(upgrade|tự nâng cấp)\s*", "", arg, flags=re.I).strip()
-        if not arg or arg == "scan":
-            issues = scan_for_issues(self)
-            if not issues:
-                return "🔧 Quét xong: chưa thấy lỗi dễ tự vá. (Dùng `upgrade <file>|<yêu cầu>` để nhờ tôi sửa.)"
-            lines = [f"🔧 Quét thấy {len(issues)} điểm (tự vá mức medium):"]
-            for x in issues[:12]:
-                lines.append(f"  • {x['file']}:{x['line']} — {x['issue']} ({x['severity']})")
-            return "\n".join(lines)
-        if arg.startswith("rollback"):
-            fn = arg.split(None, 1)[1].strip() if " " in arg else ""
-            if not fn:
-                bks = list_backups()
-                return "🗂️ Backup hiện có:\n  " + ("\n  ".join(bks) if bks else "(không có)") + "\nDùng: upgrade rollback <file>"
-            return upgrade_rollback(fn)
-        if arg.startswith("loop"):
-            if not hasattr(self, "_upgrade_loop"):
-                self._upgrade_loop = SelfUpgradeLoop(self, interval=600, verbose=True)
-            self._upgrade_loop.start()
-            return "🔧 Đã bật vòng lặp tự nâng cấp nền (quét mỗi 10 phút)."
-        # format: <file>|<instruction>
-        if "|" in arg:
-            fn, instr = arg.split("|", 1)
-            res = propose_upgrade(self, fn.strip(), instr.strip())
-            if res.get("ok"):
-                return (f"✅ Đã tự nâng cấp {fn}: {res.get('diff_summary')}\n"
-                        f"   git checkpoint: {res.get('git')} | backup: {Path(res['backup']).name}\n"
-                        f"   (rollback: `upgrade rollback {fn}`)")
-            return f"⚠️ Không nâng cấp được: {res.get('error','')}"
-        return ("Dùng:\n"
-                "  upgrade scan                 — quét lỗi có thể tự vá\n"
-                "  upgrade <file>|<yêu cầu>     — tự sửa file\n"
-                "  upgrade loop                 — bật tự nâng cấp nền\n"
-                "  upgrade rollback <file>      — hoàn tác")
-
-    def _consolidate_command(self, text: str):
-        removed = self.mem.consolidate_memory()
-        return f"🧹 Đã gom nhớ: xóa {removed} mẩu kiến thức trùng lặp." if removed else "🧹 Bộ nhớ đã sạch, không có trùng lặp."
-
-    def _cmd_status(self) -> str:
-        """Trạng thái agent."""
-        try:
-            stats = self.mem.stats()
-            brain_status = self.brain.status()
-            active_goals = self.mem.get_active_goals(3)
-            pending_skills = list_pending() if _HAS_SELF_IMPROVE else []
-            active_skills = list_active() if _HAS_SELF_IMPROVE else []
-            
-            lines = [
-                f"🧠 CLARA-AGI Status",
-                f"  • Backend: {brain_status['backend']}",
-                f"  • Model: {brain_status['model']}",
-                f"  • Đã học episodes: {stats.get('episodes', 0)}",
-                f"  • Đã ghi semantics: {stats.get('semantics', 0)}",
-                f"  • Trạng thái hoạt động: {stats.get('active_goals', 0)} goals",
-            ]
-            
-            if _HAS_SELF_IMPROVE:
-                lines.append(f"  • Skills pending: {len(pending_skills)}")
-                lines.append(f"  • Skills active: {len(active_skills)}")
-            
-            return "\n".join(lines)
-        except Exception as e:
-            logger.error(f"Lỗi _cmd_status: {e}")
-            return f"❌ Lỗi lấy trạng thái: {e}"
-
-    def _cmd_skills(self) -> str:
-        """Danh sách skills."""
-        if not _HAS_SELF_IMPROVE:
-            return "❌ Self-improve module không khả dụng."
-        
-        active = list_active()
-        pending = list_pending()
-        
-        lines = ["📋 Skills Catalog:"]
-        
-        if active:
-            lines.append("\n✅ Active skills:")
-            for s in active:
-                lines.append(f"  • {s['file']} (stem: {s['stem']})")
+    # Self-improve (tự lên mạng học code, đề xuất skill mới)
+    improver = None
+    if args.load_skills:
+        from self_improve import load_custom_skills as _load_custom_skills
+        print("⚠️ Đang nạp skill chưa audit — chỉ dùng trên môi trường test")
+        _loaded = _load_custom_skills(agi)
+        if _loaded:
+            print(f"🛠️ Đã nạp {len(_loaded)} skill đã audit: {', '.join(_loaded)}")
         else:
-            lines.append("\n✅ Active skills: (none)")
-        
-        if pending:
-            lines.append(f"\n⏳ Pending skills: {len(pending)}:")
-            for p in pending:
-                lines.append(f"  • {p['file']}")
-        else:
-            lines.append(f"\n⏳ Pending skills: (none)")
-        
-        return "\n".join(lines)
-
-    def _cmd_help(self) -> str:
-        """Hỗ trợ lệnh."""
-        lines = [
-            "🤖 CLARA-AGI Commands:",
-            "",
-            "• `chào CLARA` / nhập tin nhắn thường - trò chuyện",
-            "• `/status` - trạng thái agent",
-            "• `/skills` - danh sách skills",
-            "• `/approve <tên>` - kích hoạt skill pending",
-            "• `/reject <tên>` - từ chối skill pending",
-            "• `/clear` - xóa working memory",
-            "• `/help` - trợ giúp này",
-            "• `--once` - chạy 1 lần suy nghĩ",
-            "• `--daemon` - chạy nền (auto-learn)",
-            "",
-            "Skill management:",
-            "  - `approve <tên_file>`: Kích hoạt skill từ _pending/",
-            "  - `reject <tên_file>`: Từ chối và xóa skill",
-            "  - Skills tự tạo qua `improve` command",
-        ]
-        return "\n".join(lines)
-
-    def chat(self, user_text: str) -> str:
-        """Thông thường chat."""
-        start = time.time()
-        self.turn_count += 1
-        self.mem.set_trait("turn_count", self.turn_count)
-        text = user_text.strip()
-        
-        if not text:
-            return "Bạn chưa nói gì 😊"
-        
-        special = self._handle_special_commands(text)
-        if special is not None:
-            return special
-
-        # Plain-text meta commands (feedback học, tự nâng cấp, gom nhớ)
-        meta = self._handle_meta_commands(text)
-        if meta is not None:
-            return meta
-
-        # Log bắt đầu turn
-        logger.info(f"Turn {self.turn_count}: received user input", 
-                   extra={"user_text": text[:100] if len(text) > 100 else text})
-        
-        self.wm = [{"role": "user", "content": text}]
-        
-        # 1. PERCEIVE
-        try:
-            emotion = self._detect_emotion(text)
-            self.wm.append({"role": "emotion", "content": emotion})
-        except Exception as e:
-            logger.warning(f"Emotion detect error: {e}")
-            self.wm.append({"role": "emotion", "content": "neutral"})
-        
-        # Theory of Mind: nhìn nhận người dùng đang cần gì
-        try:
-            tom = self._theory_of_mind(text)
-            self.wm.append({"role": "tom", "content": tom})
-        except Exception as e:
-            logger.warning(f"ToM error: {e}")
-            self.wm.append({"role": "tom", "content": ""})
-        
-        # 2. RETRIEVE
-        try:
-            sem = self.mem.recall_semantics(text, limit=8)
-            epi = self.mem.recall_episodes(text, limit=6)
-            procs = self.mem.find_relevant_procedure(text)
-            goals = self.mem.get_active_goals(4)
-            # recall mở rộng: lấy thêm fact phẳng để tăng context (thông minh hơn)
-            extra_facts = self.mem.recall_semantics("", limit=5)
-            for ef in extra_facts:
-                if ef not in sem and len(sem) < 10:
-                    sem.append(ef)
-        except Exception as e:
-            logger.error(f"Retrieve error: {e}")
-            sem, epi, procs, goals = [], [], None, []
-        
-        if sem:
-            self.wm.append({"role": "semantic_hits", "content": [s["fact"] for s in sem]})
-        if epi:
-            self.wm.append({"role": "episodic_hits", "content": [e["content"][:120] for e in epi]})
-        if procs:
-            self.wm.append({"role": "procedure", "content": {"name": procs["name"], "steps": procs["steps"][:200]}})
-        if goals:
-            self.wm.append({"role": "active_goals", "content": [g["goal"][:80] for g in goals]})
-        
-        # User model
-        try:
-            um = self.mem.all_user()
-            if um:
-                um_dict = {}
-                for u in um[:6]:
-                    try:
-                        um_dict[u["k"]] = json.loads(u["v"])
-                    except Exception:
-                        um_dict[u["k"]] = u["v"]
-                self.wm.append({"role": "user_model", "content": um_dict})
-        except Exception as e:
-            logger.warning(f"User model error: {e}")
-        
-        # Chat history
-        if self.history:
-            self.wm.append({"role": "chat_history", "content": self.history[-6:]})
-        
-        # 3. FEEL
-        try:
-            uncertainty = self._uncertainty(text, sem, epi)
-            curiosity_bonus = self.traits["curiosity"] * 0.15
-            uncertainty = min(1.0, uncertainty + curiosity_bonus - (0.1 if procs else 0))
-            self.wm.append({"role": "uncertainty", "content": uncertainty})
-        except Exception as e:
-            logger.error(f"Feel error: {e}")
-            self.wm.append({"role": "uncertainty", "content": 0.5})
-        
-        # 4. PLAN
-        try:
-            plan_prompt = f"Người dùng nói: {text}\n[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]"
-            plan_raw = self.brain.think("__PLAN__", plan_prompt, temperature=0.3)
-            plan = self._parse_plan(plan_raw)
-            self.wm.append({"role": "plan", "content": plan})
-        except Exception as e:
-            logger.error(f"Plan error: {e}")
-            self.wm.append({"role": "plan", "content": {"needs_tool": False, "tool_name": "none", "tool_args": ""}})
-        
-        # 5-6. TOOL + ACT
-        try:
-            tool_result = ""
-            tool_used = "none"
-            tool_args = plan.get("tool_args") or ""
-            
-            if plan.get("needs_tool") and tool_args and tool_args != "none":
-                tool_result = parse_and_dispatch(self, tool_args)
-                tool_used = plan.get("tool_name", tool_args.split()[0])
-                self.mem.use_procedure("use_tool", success=("❌" not in tool_result and "Lỗi" not in tool_result))
-            self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-        except Exception as e:
-            logger.error(f"Tool dispatch error: {e}")
-            self.wm.append({"role": "tool", "name": "none", "result": f"❌ Lỗi khi dùng tool: {str(e)[:200]}"})
-        
-        if tool_used == "none":
-            forced = self._forced_tool(text)
-            if forced:
-                try:
-                    tool_result = parse_and_dispatch(self, forced)
-                    tool_used = forced.split()[0]
-                    self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-                except Exception as e:
-                    self.wm.append({"role": "tool", "name": "none", "result": f"❌ {e}"})
-        
-        if tool_used == "none":
-            for _ in range(2):
-                if tool_used == "none":
-                    break
-                next_prompt = (
-                    f"Người dùng: {text}\n"
-                    f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
-                    f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
-                    "Nếu kết quả công cụ trên chưa đủ để trả lời, hãy chọn công cụ tiếp theo cần thiết. "
-                    "Chỉ trả về MỘT dòng: '<tool_name> <args>' hoặc 'none'."
-                )
-                try:
-                    next_raw = self.brain.think("__TOOL__", next_prompt, temperature=0.1, num_predict=120)
-                    m = re.search(r"^(calc|read|write|list|run_python|search|now|help|none)\\s+(.*)", next_raw.strip(), re.S | re.I)
-                    if not m:
-                        break
-                    next_tool = m.group(1).lower()
-                    next_args = m.group(2).strip()
-                    if next_tool == "none":
-                        break
-                    tool_result = parse_and_dispatch(self, f"{next_tool} {next_args}")
-                    tool_used = next_tool
-                    self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-                except Exception as e:
-                    logger.error(f"Tool retry error: {e}")
-                    self.wm.append({"role": "tool", "name": "none", "result": f"❌ {e}"})
-                    tool_used = "none"
-        
-        # 7. REFLECT
-        try:
-            reflect_prompt = (
-                f"Người dùng: {text}\n"
-                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
-                f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
-                "Phê bình câu trả lời: tìm lỗi, chỗ yếu, chỗ quá chung chung. "
-                "Cho điểm trên thang 10. Trả lời ngắn gọn."
-            )
-            reflect_raw = self.brain.think("__REFLECT__", reflect_prompt, temperature=0.3)
-            # Extract score
-            score_match = re.search(r"(\d+(?:\.\d+)?)", reflect_raw.strip())
-            reflect_score = float(score_match.group(1)) if score_match else 5.0
-            
-            # Reflect on tool result too
-            if tool_used != "none":
-                self.mem.use_procedure("use_tool", success=(reflect_score >= 5.0))
-        except Exception as e:
-            logger.warning(f"Reflect error: {e}")
-            reflect_score = 5.0
-        
-        # 8. REWRITE
-        try:
-            rewrite_prompt = (
-                f"Dựa trên lời phê bình (điểm {reflect_score}/10), "
-                f"hãy viết lại câu trả lời sao cho tốt hơn. "
-                f"Chỉ trả về câu trả lời mới bằng tiếng Việt, ngắn gọn (2-4 câu), không giải thích thêm.\n\n"
-                f"Người dùng: {text}\n"
-                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
-                f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]"
-            )
-            rewrite_raw = self.brain.think("__REWRITE__", rewrite_prompt, temperature=0.3)
-            answer = rewrite_raw.strip()
-        except Exception as e:
-            logger.error(f"Rewrite error: {e}")
-            # Fallback: direct answer
-            answer = self._direct_answer(text)
-        
-        # 9. ANSWER
-        try:
-            # Store in history
-            self.history.append({"role": "user", "content": text})
-            self.history.append({"role": "assistant", "content": answer})
-            # Keep history manageable
-            if len(self.history) > 50:
-                self.history = self.history[-50:]
-            
-            # Update traits
-            if len(answer) > 10:
-                self.mem.set_trait("verbosity", min(1.0, self.traits["verbosity"] + 0.01))
-            
-            # Persist memory (học "nhớ:", cập nhật user model, lưu episode)
-            try:
-                self._persist_memory(text, answer)
-            except Exception as e:
-                logger.warning(f"Persist memory lỗi: {e}")
-            
-            elapsed = time.time() - start
-            logger.info(f"Turn {self.turn_count}: answering in {elapsed:.2f}s", 
-                       extra={"response_len": len(answer), "tool_used": tool_used, "elapsed": elapsed})
-            
-            return answer
-        except Exception as e:
-            logger.error(f"Answer error: {e}")
-            traceback_str = traceback.format_exc()
-            logger.critical(traceback_str)
-            return f"❌ CLARA đang gặp sự cố kỹ thuật. Vui lòng thử lại sau."
-    
-    def _persist_memory(self, text: str, answer: str):
-        """Lưu trí nhớ sau mỗi turn: học 'nhớ:', cập nhật user model, ghi episode."""
-        low = text.lower().strip()
-
-        # 1. Học kiến thức từ "nhớ:/học:/ghi nhớ:/note:"
-        if low.startswith(("nhớ", "ghi nhớ", "học", "note")):
-            m = re.match(r"^(nhớ|ghi nhớ|học|note)\s*[:\-]?\s*(.+)$", text, re.I)
-            if m:
-                fact = m.group(2).strip()
-                self.mem.learn("user_taught", fact, confidence=0.8, source="user_taught")
-                self.mem.remember_episode("learning", fact, importance=0.8, emotion=0.2)
-
-        # 2. Cập nhật user model từ các mẫu quen thuộc
-        # tên: "tôi tên Nam" / "tên tôi là Nam"
-        m_name = re.search(r"(?:tôi\s*tên|tên\s*tôi\s*(?:là|tên)?)\s*([A-ZÀ-Ỹ][a-zà-ỹ]*)", text, re.I)
-        if m_name:
-            self.mem.set_user("name", m_name.group(1), confidence=0.9)
-            self.mem.learn("user_name", f"Người dùng tên là {m_name.group(1)}", confidence=0.9, source="user_taught")
-        # thích: "thích lập trình Python"
-        m_like = re.search(r"thích\s+([^,.!?]+)", text, re.I)
-        if m_like:
-            item = m_like.group(1).strip()
-            self.mem.set_user("likes", [item], confidence=0.85, merge=True)
-            self.mem.learn("user_preference", f"Người dùng thích {item}", confidence=0.8, source="user_taught")
-
-        # 3. Luôn lưu episode hội thoại (cho episodic memory / dream)
-        self.mem.remember_episode("conversation", f"User: {text}\nCLARA: {answer}",
-                                  importance=0.4, emotion=0.0)
-
-    def _detect_emotion(self, text: str) -> str:
-        """Phát hiện cảm xúc đơn giản."""
-        text_lower = text.lower()
-        if any(k in text_lower for k in ["đau", "buồn", "thất", "sorry", "xin lỗi"]):
-            return "sad"
-        elif any(k in text_lower for k in ["vui", "happy", "yah", "wow", "great"]):
-            return "happy"
-        elif any(k in text_lower for k in ["tăng lên", "giúp", "cần help"]):
-            return "asking"
-        return "neutral"
-    
-    def _theory_of_mind(self, text: str) -> str:
-        """Nhìn nhận người dùng đang cần gì."""
-        text_lower = text.lower()
-        if "tên tôi" in text_lower or "tôi tên" in text_lower:
-            return "User hỏi tên của chính mình (từ user model)"
-        elif any(k in text_lower for k in ["làm sao", "cách làm", "hướng dẫn"]):
-            return "User cần hướng dẫn/giải pháp"
-        elif any(k in text_lower for k in ["tại sao", "ký rệ"]):
-            return "User muốn hiểu nguyên nhân"
-        return "User giao tiếp thông thường"
-    
-    def _uncertainty(self, text: str, sem: list, epi: list) -> float:
-        """Tính mức độ không chắc chắn."""
-        # Nếu có semantic hits + không có episodic -> khá chắc
-        if sem and not epi:
-            return 0.3
-        # Nếu không có gì -> rất chắc
-        if not sem and not epi:
-            return 0.1
-        # Nếu có episodic -> đang xử lý
-        if epi:
-            return 0.5
-        return 0.7
-    
-    def _parse_plan(self, plan_raw: str) -> dict:
-        """Phân tích kế hoạch từ đầu ra Brain."""
-        try:
-            # Try JSON parse first
-            plan = json.loads(plan_raw.strip())
-            if isinstance(plan, dict):
-                # Ensure required keys
-                plan.setdefault("needs_tool", False)
-                plan.setdefault("tool_name", "none")
-                plan.setdefault("tool_args", "")
-                return plan
-        except (json.JSONDecodeError, ValueError):
-            pass
-        
-        # Fallback: parse by patterns
-        plan = {"needs_tool": False, "tool_name": "none", "tool_args": ""}
-        
-        # Check for tool patterns
-        tool_match = re.search(r'(calc|read|write|list|run_python|search|now|help)\s+(.*)', plan_raw.strip())
-        if tool_match:
-            plan["needs_tool"] = True
-            plan["tool_name"] = tool_match.group(1)
-            plan["tool_args"] = tool_match.group(2).strip()
-            return plan
-        
-        # Check JSON-like
-        json_match = re.search(r'\{.*\}', plan_raw.strip(), re.S)
-        if json_match:
-            try:
-                parsed = json.loads(json_match.group(0))
-                if isinstance(parsed, dict):
-                    plan.update(parsed)
-                    plan.setdefault("needs_tool", False)
-                    plan.setdefault("tool_name", "none")
-                    plan.setdefault("tool_args", "")
-                    return plan
-            except (json.JSONDecodeError, ValueError):
-                pass
-        
-        return plan
-    
-    def _forced_tool(self, text: str) -> str:
-        """Làm power tool khi user rõ ràng muốn dùng tool."""
-        text_lower = text.lower()
-        if any(k in text_lower for k in ["tính", "plus", "minus", "nhân", "chia", "mũ"]):
-            return f"calc {text}"
-        elif any(k in text_lower for k in ["tìm", "search", "google", "web"]):
-            # Extract query after search keywords
-            for kw in ["tìm ", "search ", "web "]:
-                if kw in text_lower:
-                    query = text_lower.split(kw, 1)[1].strip()
-                    return f"search {query}"
-                    break
-        elif any(k in text_lower for k in ["đọc", "read", "file"]):
-            # Extract filename
-            import re
-            match = re.search(r'read\s+(.+)', text_lower)
-            if match:
-                return f"read {match.group(1).strip()}"
-        return None
-    
-    def _direct_answer(self, text: str) -> str:
-        """Trả lời trực tiếp khi rewrite fail."""
-        # Check if we have relevant memories
-        try:
-            sem = self.mem.recall_semantics(text, limit=3)
-            if sem:
-                # Return summary of relevant facts
-                facts = [s["fact"] for s in sem[:2]]
-                return f"Tôi nhớ rằng: {'; '.join(facts)}"
-        except Exception:
-            pass
-        return f"CLARA đang suy nghĩ về: {text[:80]}..."
-
-
-def _setup_agent(args):
-    """Khởi tạo agent (và các thread autolearn/self-improve nếu được yêu cầu)."""
-    agent = ClarasAGI(force_micro=args.micro, model=args.model)
-    threads = []
-
-    # Auto-learn (tự học khi rảnh)
-    if args.auto_learn and _HAS_AUTOLearn:
-        try:
-            auto = AutoLearner(agent, interval=config.section("autolearner").get("interval_seconds", 25), verbose=True)
-            auto.start()
-            threads.append(auto)
-            logger.info("AutoLearner started")
-        except Exception as e:
-            logger.warning(f"Không khởi được AutoLearner: {e}")
-
-    # Self-upgrade (tự nâng cấp chính mình) — tự bật nếu có flag --self-improve
-    if args.self_improve and _HAS_SELF_UPGRADE:
-        try:
-            up = SelfUpgradeLoop(agent, interval=config.section("self_upgrade").get("interval_seconds", 600), verbose=True)
-            up.start()
-            threads.append(up)
-            logger.info("SelfUpgradeLoop started (tự nâng cấp nền)")
-        except Exception as e:
-            logger.warning(f"Không khởi được SelfUpgradeLoop: {e}")
-
-    # Self-improve (tự nghiên cứu web học thêm)
-    if args.self_improve and _HAS_SELF_IMPROVE:
-        try:
-            from self_improve import load_custom_skills, research
-            loaded = load_custom_skills(agent)
-            if loaded:
-                logger.info(f"Đã nạp {len(loaded)} skill tự tạo: {', '.join(loaded)}")
-            import threading
-            improver_running = {"on": True}
+            print("ℹ️ Không có skill nào được nạp.")
+    if args.self_improve:
+        from self_improve import improve, list_pending, approve_skill, reject_skill, load_custom_skills, research
+        loaded = load_custom_skills(agi)
+        if loaded:
+            print(f"🛠️ Đã nạp {len(loaded)} skill tự tạo trước đó: {', '.join(loaded)}")
+        # bật thread nghiên cứu định kỳ
+        import threading, random
+        def _research_loop():
+            time.sleep(15)
             topics = [
                 "python useful utility function example",
                 "cách tính chiết khấu phần trăm trong Python",
@@ -694,160 +115,250 @@ def _setup_agent(args):
                 "python text processing tips",
                 "cách tính chỉ số BMI Python",
             ]
-            research_interval = config.section("self_improve").get("max_pages_research", 3)
+            while True:
+                if not getattr(improver_running, "on", True): break
+                try:
+                    topic = random.choice(topics)
+                    print(f"\r🌐 [tự nâng cấp] đang nghiên cứu: {topic}")
+                    research(agi, topic, max_pages=1)
+                    print(f"\r🌐 [tự nâng cấp] đã học xong '{topic}'")
+                except Exception as e:
+                    print(f"\r🌐 [tự nâng cấp] lỗi: {e}")
+                # ngủ theo chu kỳ research-interval
+                for _ in range(args.research_interval):
+                    if not getattr(improver_running, "on", True): return
+                    time.sleep(1)
+        class ImproverRunning: on = True
+        improver_running = ImproverRunning()
+        t = threading.Thread(target=_research_loop, daemon=True); t.start()
+        print(f"🌐 Chế độ TỰ NÂNG CẤP đã BẬT (mỗi {args.research_interval}s tìm trên web học thêm).")
+        print()
 
-            def _research_loop():
-                import random
-                time.sleep(15)
-                while improver_running["on"]:
-                    try:
-                        topic = random.choice(topics)
-                        logger.info(f"[tự nâng cấp] đang nghiên cứu: {topic}")
-                        research(agent, topic, max_pages=1)
-                        logger.info(f"[tự nâng cấp] đã học xong '{topic}'")
-                    except Exception as e:
-                        logger.warning(f"[tự nâng cấp] lỗi: {e}")
-                    for _ in range(research_interval):
-                        if not improver_running["on"]:
-                            return
-                        time.sleep(1)
+    if agi.first_run:
+        print("🎉 Có vẻ đây là lần đầu chúng ta gặp nhau! Hãy bắt đầu bằng cách cho tôi")
+        print("   biết tên bạn, hoặc cứ nói bất cứ điều gì bạn muốn.\n")
 
-            t = threading.Thread(target=_research_loop, daemon=True)
-            t.start()
-            threads.append(("self_improve", improver_running))
-            logger.info("Self-improve research loop started")
+    while True:
+        try:
+            u = input("Bạn > ").strip()
+        except (EOFError, KeyboardInterrupt):
+            auto.stop()
+            print("\n👋 Tạm biệt! Tôi giữ hết trí nhớ cho lần gặp sau.")
+            break
+        if not u:
+            continue
+        low = u.lower()
+        if low in ("quit","exit","bye","thoát","bye bye"):
+            auto.stop()
+            print("👋 Tạm biệt! Hẹn gặp lại — tôi sẽ giữ mọi thứ đã học.")
+            break
+        # lệnh điều khiển tự học
+        if low.startswith("autolearn"):
+            rest = low[len("autolearn"):].strip()
+            if rest in ("on","bật","start"):
+                if auto.start():
+                    print(f"✅ Đã BẬT tự học nền (mỗi {args.idle_interval}s).")
+                else:
+                    print("ℹ️ Tự học đang chạy rồi.")
+            elif rest in ("off","tắt","stop"):
+                auto.stop()
+                print("🛑 Đã tắt tự học nền.")
+            elif rest in ("status","stat","trạng thái"):
+                print(json.dumps(auto.status(), ensure_ascii=False, indent=2))
+            else:
+                print("Sử dụng: autolearn on | off | status")
+            print()
+            continue
+        # lệnh self-improve
+        if low.startswith(("learn ", "nghiên cứu ", "research ", "học ")):
+            from self_improve import improve
+            topic = re.sub(r"^(learn|nghiên cứu|research|học)\s*[:\-]?\s*", "", low).strip()
+            print("🔎 Đang tìm hiểu và đề xuất skill mới...")
+            out = improve(agi, topic)
+            print(out)
+            print()
+            continue
+        if low.startswith("search ") or low.startswith("tìm "):
+            from web_tools import web_search
+            q = re.sub(r"^(search|tìm)\s*[:\-]?\s*", "", low).strip()
+            print("🔎 Tìm kiếm...")
+            res = web_search(q, max_results=5)
+            for i, r in enumerate(res, 1):
+                if "error" in r:
+                    print(r["error"]); break
+                print(f"{i}. {r['title']}\n   {r['url']}\n   {r['snippet']}\n")
+            print()
+            continue
+        if low.startswith("pending"):
+            from self_improve import list_pending
+            items = list_pending()
+            if not items:
+                print("📭 Không có skill nào đang chờ duyệt.")
+            else:
+                print(f"📋 Skill chờ duyệt ({len(items)}):")
+                for it in items:
+                    print(f"  • {it['file']}  ({it['size']}B)")
+                print("Dùng 'approve <tên>' để kích hoạt, 'reject <tên>' để xóa.")
+            print()
+            continue
+        if low.startswith("approve"):
+            from self_improve import approve_skill
+            name = low[len("approve"):].strip()
+            print(approve_skill(name)); print(); continue
+        if low.startswith("reject"):
+            from self_improve import reject_skill
+            name = low[len("reject"):].strip()
+            print(reject_skill(name)); print(); continue
+        if low.startswith("skills"):
+            from self_improve import list_active
+            items = list_active()
+            procs = agi.mem.list_procedures()
+            print(f"🛠️ Skill đã kích hoạt ({len(items)}):")
+            for it in items: print(f"  • {it['file']}")
+            print(f"\n📚 Thủ tục nội tại ({len(procs)}):")
+            for p in procs[:20]: print(f"  • {p['name']} (wr={p['success_rate']:.2f})")
+            print()
+            continue
+        # lệnh CLI khác xử lý đặc biệt (quit đã bắt, commands/status/dream/goal/forget/export do agent xử lý)
+        try:
+            out = agi.chat(u)
         except Exception as e:
-            logger.warning(f"Không khởi được self-improve: {e}")
+            out = f"❌ Lỗi nội bộ: {e}"
+        print("CLARA>", out)
 
-    return agent, threads
+        # Thỉnh thoảng hỏi bạn điều tò mò (do autolearn nghĩ ra khi rảnh)
+        pending = agi.mem.recall_episodes(kind="pending_question", limit=1, recent_only=True)
+        if pending and random.random() < 0.3:
+            q = pending[0]["content"]
+            print(f"🤔 Nhân tiện, {q}")
+            agi.mem.conn.execute("DELETE FROM episodes WHERE id=?", (pending[0]["id"],))
+            agi.mem.conn.commit()
+        print()
 
 
-def _interactive_loop(agent):
-    """Vòng lặp chat tương tác."""
-    print("🤖 CLARA-AGI sẵn sàng! Gõ 'help' để xem lệnh.")
-    print("💡 Gõ `/help` trong hội thoại để xem trợ giúp.")
-    print("• Ctrl+C để thoát\n")
+def run_web(args):
     try:
-        while True:
-            try:
-                user_input = input("CLARA> ").strip()
-                if not user_input:
-                    continue
-                if user_input.startswith("/"):
-                    result = agent._handle_special_commands(user_input)
-                    if result:
-                        print(result)
-                    continue
-                result = agent.chat(user_input)
-                print(result)
-            except KeyboardInterrupt:
-                print("\n👋 Tạm biệt!")
-                break
-            except EOFError:
-                # Hết input (vd: pipe stdin vào) -> thoát sạch, không lặp vô tận
-                print("\n👋 Tạm biệt!")
-                break
-            except Exception as e:
-                logger.error(f"Chat error: {e}")
-                print(f"❌ Lỗi: {e}")
+        from webui import create_app
+    except ImportError as e:
+        print(f"❌ Không thể nạp webui: {e}")
+        print("   Cài thêm flask: pip install flask")
+        sys.exit(1)
+    from agent import ClarasAGI
+    from autolearn import AutoLearner
+    agi = ClarasAGI(force_micro=args.micro, model=args.model,
+                    dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                    language=args.language or os.environ.get("CLARA_LANGUAGE"))
+    auto = None
+    if args.auto_learn:
+        auto = AutoLearner(agi, interval=args.idle_interval, verbose=False)
+        auto.start()
+        print(f"💤 Tự học nền BẬT (mỗi {args.idle_interval}s).")
+    app = create_app(agi)
+    host = args.host or "127.0.0.1"
+    port = args.port or 5000
+    print(WELCOME)
+    print(f"🌐 Web UI đang chạy tại  http://{host}:{port}")
+    print("   Mở trình duyệt để nói chuyện với CLARA. Nhấn Ctrl+C để dừng.")
+    try:
+        app.run(host=host, port=port, debug=False, use_reloader=False)
+    except KeyboardInterrupt:
+        if auto: auto.stop()
+        print("\n👋 Đã dừng.")
+
+
+def run_voice(args):
+    try:
+        from voice import VoiceCLARA
+    except ImportError as e:
+        print(f"❌ Không thể nạp voice module: {e}")
+        print("   Cần: pip install SpeechRecognition pyttsx3 pyaudio")
+        sys.exit(1)
+    from agent import ClarasAGI
+    agi = ClarasAGI(force_micro=args.micro, model=args.model,
+                    profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                    language=args.language or os.environ.get("CLARA_LANGUAGE"))
+    v = VoiceCLARA(agi)
+    print(WELCOME)
+    print("🎙️ Chế độ giọng nói đã sẵn sàng. Nhấn Enter để nói, hoặc Ctrl+C để dừng.")
+    try:
+        v.loop()
     except KeyboardInterrupt:
         print("\n👋 Tạm biệt!")
 
 
 def main():
-    """CLI entry point.
+    ap = argparse.ArgumentParser(description=f"CLARA-AGI v{__version__}")
+    ap.add_argument("--micro", action="store_true", help="Bắt buộc dùng micro brain (không Ollama)")
+    ap.add_argument("--model", type=str, default=None, help="Model Ollama (vd qwen2.5:0.5b)")
+    ap.add_argument("--web", action="store_true", help="Mở giao diện web")
+    ap.add_argument("--voice", action="store_true", help="Chế độ giọng nói")
+    ap.add_argument("--host", type=str, default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=5000)
+    ap.add_argument("--dream-every", type=int, default=10,
+                    help="Số lượt nói rồi tôi tự 'ngủ mơ' tổng hợp (0=tắt)")
+    ap.add_argument("--no-auto-skill", action="store_true", help="Tắt tự tạo skill mới")
+    ap.add_argument("--dangerous-python", action="store_true", help="BẬT tool run_python trong sandbox (mặc định tắt)")
+    ap.add_argument("--auto-learn", action="store_true", default=False,
+                    help="BẬT chế độ tự học khi rảnh (mặc định tắt; dùng --auto-learn để bật)")
+    ap.add_argument("--no-auto-learn", action="store_false", dest="auto_learn",
+                    help="Tắt tự học nền khi khởi động")
+    ap.add_argument("--self-improve", action="store_true", default=False,
+                    help="BẬT chế độ TỰ NÂNG CẤP (mặc định tắt; chỉ bật khi cần)")
+    ap.add_argument("--no-self-improve", action="store_false", dest="self_improve",
+                    help="Tắt tự nghiên cứu web khi khởi động")
+    ap.add_argument("--research-interval", type=int, default=300,
+                    help="Số giây giữa mỗi lần tự nghiên cứu web (mặc định 300 = 5 phút). Chỉ dùng với --self-improve")
+    ap.add_argument("--idle-interval", type=int, default=25,
+                    help="Số giây giữa mỗi bước tự học (mặc định 25). Tăng lên nếu thấy CPU nóng.")
+    ap.add_argument("--quiet", action="store_true", help="Bớt log tự học")
+    ap.add_argument("--profile", type=str, default="mobile_12gb_safe", help="Runtime profile: eco|mobile_12gb_safe|custom")
+    ap.add_argument("--idle-study", action="store_true", help="Bật bounded idle-study opt-in")
+    ap.add_argument("--allow-network", action="store_true", help="Cho phép network trong idle-study (mặc định tắt)")
+    ap.add_argument("--load-skills", action="store_true", default=False,
+                    help="Nạp skill đã audit từ skills_custom/_quarantine (mặc định tắt)")
+    ap.add_argument("--benchmark-provider", type=str, default="ollama", help="Backend for benchmark")
+    ap.add_argument("--language", type=str, default=None, help="Ngôn ngữ ưu tiên: vi|en|auto")
+    ap.add_argument("--once", nargs="+", metavar="TEXT",
+                    help="Chạy 1 lần suy nghĩ rồi thoát (text sau cờ). VD: python main.py --once \"chào\"")
+    ap.add_argument("--enable-self-upgrade", action="store_true", default=False,
+                    help="BẬT self-upgrade engine (tự vá code). TẮT mặc định — cần cờ này mới chạy.")
+    ap.add_argument("--self-upgrade-interval", type=int, default=600,
+                    help="Số giây giữa mỗi lần self-upgrade engine tự rà soát (mặc định 600).")
+    args = ap.parse_args()
+    raw_lang = args.language or os.environ.get("CLARA_LANGUAGE") or "vi"
+    args.language = raw_lang
 
-    Cú pháp:
-      python main.py                         -> chat tương tác
-      python main.py chat "câu hỏi"          -> chat 1 lần (in kết quả)
-      python main.py --once "câu hỏi"        -> chat 1 lần (cho daemon/testing)
-      python main.py status                  -> in trạng thái
-      python main.py skills                  -> danh sách skills
-      python main.py help                    -> trợ giúp
-      python main.py --web                   -> giao diện web (cần flask)
-      python main.py --auto-learn            -> tự học nền
-      python main.py --self-improve          -> tự nghiên cứu web
-      python main.py --micro                 -> ép dùng micro brain
-      python main.py --model qwen2.5:3b      -> chọn model
-    """
-    parser = argparse.ArgumentParser(
-        description="CLARA-AGI v1.4 - Agent tự chủ",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    # Optional flags (giữ cú pháp --once "..." đã ghi trong doc)
-    parser.add_argument("--once", nargs="+", metavar="TEXT", help="Chạy 1 lần suy nghĩ rồi thoát")
-    parser.add_argument("--daemon", action="store_true", help="Chạy daemon (in sẵn sàng, không block)")
-    parser.add_argument("--auto-learn", action="store_true", help="Bật tự học khi rảnh (AutoLearner)")
-    parser.add_argument("--self-improve", action="store_true", help="Bật tự nghiên cứu web học thêm")
-    parser.add_argument("--web", action="store_true", help="Chạy giao diện web (cần flask)")
-    parser.add_argument("--micro", action="store_true", help="Ép dùng micro brain (không cần Ollama)")
-    parser.add_argument("--model", default=None, help="Chọn model Ollama (vd: qwen2.5:3b)")
-    # Positional command (chat/status/skills/help) + phần còn lại làm args
-    parser.add_argument("command", nargs="?", default="chat",
-                        choices=["chat", "status", "skills", "help"],
-                        help="Lệnh (mặc định: chat)")
-    parser.add_argument("args", nargs=argparse.REMAINDER, help="Tham số cho lệnh (vd: chat 'câu hỏi')")
+    if getattr(args, "benchmark_model", None):
+        try:
+            from benchmark import run_benchmark
+            report = run_benchmark(args.benchmark_model, backend=args.benchmark_provider)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        except Exception as e:
+            print(f"❌ Benchmark failed: {e}")
+        sys.exit(0)
 
-    try:
-        args = parser.parse_args()
+    if args.once:
+        # Chạy 1 lần suy nghĩ rồi thoát (dùng cho daemon/testing)
+        from agent import ClarasAGI
+        from web_tools import allow_network as _allow_network
+        _allow_network(args.allow_network)
+        import tools as _tools
+        _tools._set_dangerous_python(args.dangerous_python)
+        agi = ClarasAGI(force_micro=args.micro, model=args.model,
+                        dream_every=args.dream_every, auto_skill=not args.no_auto_skill,
+                        profile=args.profile, idle_study=args.idle_study, allow_network=args.allow_network,
+                        language=args.language or os.environ.get("CLARA_LANGUAGE"))
+        user_text = " ".join(args.once)
+        print(agi.chat(user_text))
+        sys.exit(0)
 
-        # --once có quyền ưu tiên cao nhất
-        if args.once:
-            agent = ClarasAGI(force_micro=args.micro, model=args.model)
-            user_text = " ".join(args.once)
-            result = agent.chat(user_text)
-            print(result)
-            return
-
-        # Khởi agent (+ threads nếu có)
-        agent, threads = _setup_agent(args)
-
-        # --daemon: in sẵn sàng rồi giữ process sống (threads nền chạy tiếp)
-        if args.daemon:
-            logger.info("CLARA-AGI daemon started")
-            print("✅ CLARA-AGI daemon đang chạy...")
-            print("• Dùng `python main.py --once \"câu hỏi\"` để test")
-            print("• Dùng `/status` trong chat để xem trạng thái")
-            print("• Ctrl+C để dừng daemon")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                logger.info("CLARA-AGI daemon stopped")
-                print("\n👋 Daemon dừng.")
-            return
-
-        # --web: giao diện web
-        if args.web:
-            try:
-                from webui import run_web
-                run_web(agent)
-            except Exception as e:
-                logger.error(f"Web UI lỗi: {e}")
-                print(f"❌ Không chạy được Web UI: {e}\n(Cần cài flask: pip install flask)")
-            return
-
-        # Lệnh positional
-        if args.command == "status":
-            print(agent._cmd_status())
-        elif args.command == "skills":
-            print(agent._cmd_skills())
-        elif args.command == "help":
-            print(agent._cmd_help())
-        elif args.command == "chat":
-            if args.args:
-                user_text = " ".join(args.args)
-                result = agent.chat(user_text)
-                print(result)
-            else:
-                _interactive_loop(agent)
-
-    except KeyboardInterrupt:
-        print("\n👋 Tạm biệt!")
-    except Exception as e:
-        logger.critical(f"Fatal error in main(): {e}", exc_info=True)
-        print(f"❌ CLARA-AGI gặp lỗi nghiêm trọng:\n{e}")
-        print("Xem logs tại: logs/clara.log")
+    if args.web:
+        run_web(args)
+    elif args.voice:
+        run_voice(args)
+    else:
+        run_cli(args)
 
 
 if __name__ == "__main__":

@@ -4,22 +4,17 @@ Hỗ trợ: Ollama local (tự nhận), fallback là MicroLLM (template, chạy 
 """
 import json, urllib.request, re, time, os, hashlib, unicodedata
 from pathlib import Path
-from config import get_config
+from prompts_vi import system_for, language_name, normalize_language
 
-# Load from config
-_llm_cfg = get_config("llm")
-DEFAULT_OLLAMA = _llm_cfg.get("default_model", "qwen2.5:1.5b")
-CANDIDATE_MODELS = _llm_cfg.get("candidate_models", [
+DEFAULT_OLLAMA = "qwen2.5:1.5b"
+CANDIDATE_MODELS = [
     "qwen2.5:3b", "qwen2.5:1.5b", "qwen2.5:0.5b",
     "phi3.5:mini", "gemma2:2b", "tinyllama", "llama3.2:1b", "llama3.2:3b",
     "mistral:7b",
-])
-OLLAMA_URL = _llm_cfg.get("ollama_url", "http://localhost:11434")
+]
+OLLAMA_URL = os.environ.get("CLARA_OLLAMA_URL", "http://localhost:11434")
 OPENAI_API_BASE = (os.environ.get("OPENAI_API_BASE") or "").rstrip("/") or f"{OLLAMA_URL}/v1"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "ollama")
-DEFAULT_TEMPERATURE = _llm_cfg.get("temperature", 0.5)
-DEFAULT_NUM_PREDICT = _llm_cfg.get("num_predict", 400)
-REQUEST_TIMEOUT = _llm_cfg.get("request_timeout", 120)
 
 
 # ---------------- OLLAMA ----------------
@@ -31,7 +26,7 @@ def ollama_list(url=OLLAMA_URL):
         return None
 
 
-def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=DEFAULT_TEMPERATURE, num_predict=DEFAULT_NUM_PREDICT):
+def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400):
     data = json.dumps({
         "model": model, "prompt": prompt, "stream": False,
         "options": {"temperature": temperature, "num_predict": num_predict,
@@ -39,31 +34,40 @@ def ollama_chat(prompt, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=DEFAUL
     }).encode()
     req = urllib.request.Request(f"{url}/api/generate", data=data,
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
         j = json.loads(resp.read())
     return (j.get("response") or "").strip()
 
 
-def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=DEFAULT_TEMPERATURE, num_predict=DEFAULT_NUM_PREDICT):
-    data = json.dumps({
+def ollama_chat_messages(messages, model=DEFAULT_OLLAMA, url=OLLAMA_URL, temperature=0.5, num_predict=400, options=None):
+    payload = {
         "model": model, "messages": messages, "stream": False,
-        "options": {"temperature": temperature, "num_predict": num_predict,
-                    "top_p": 0.9, "seed": -1}
-    }).encode()
+        "options": options or {"temperature": temperature, "num_predict": num_predict,
+                               "top_p": 0.9, "seed": -1}
+    }
+    if "temperature" not in (payload.get("options") or {}):
+        (payload.get("options") or {})["temperature"] = temperature
+    data = json.dumps(payload).encode()
     req = urllib.request.Request(f"{url}/api/chat", data=data,
                                  headers={"Content-Type": "application/json"})
+    resp = urllib.request.urlopen(req, timeout=120)
     try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            j = json.loads(resp.read())
+        j = json.loads(resp.read())
+    finally:
+        close = getattr(resp, "close", None)
+        if callable(close):
+            close()
+    msg = j.get("message") or {}
+    if not msg:
         choice = (((j.get("choices") or [{}])[0]).get("message") or {})
-        return (choice.get("content") or "").strip()
-    except Exception:
-        return None
+        msg = choice
+    content = (msg.get("content") or "").strip()
+    return content if content is not None else ""
 
 
 # ---------------- OPENAI-COMPATIBLE ----------------
 def openai_chat(prompt, model=DEFAULT_OLLAMA, base_url=OPENAI_API_BASE, api_key=OPENAI_API_KEY,
-                temperature=DEFAULT_TEMPERATURE, num_predict=DEFAULT_NUM_PREDICT):
+                temperature=0.5, num_predict=400):
     url = f"{base_url}/chat/completions"
     payload = json.dumps({
         "model": model,
@@ -78,7 +82,7 @@ def openai_chat(prompt, model=DEFAULT_OLLAMA, base_url=OPENAI_API_BASE, api_key=
                                      "Content-Type": "application/json",
                                      "Authorization": f"Bearer {api_key}",
                                  })
-    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
         j = json.loads(resp.read())
     choice = (((j.get("choices") or [{}])[0]).get("message") or {})
     return (choice.get("content") or "").strip()
@@ -151,11 +155,6 @@ class MicroLLM:
         sem = self._sem_hits(wm)
         tr = self._tool_result(prompt)
 
-        # "nhớ: ..." / "học: ..." / "ghi nhớ: ..." — học kiến thức (ưu tiên trước user_q_re)
-        m_learn = re.match(r"^(nhớ|ghi nhớ|note|học)\s*[:\-]?\s*(.+)$", user_msg, re.I)
-        if m_learn:
-            return f"✅ Đã ghi nhớ: '{m_learn.group(2).strip()}'."
-
         # câu hỏi về chính người dùng
         user_q_re = re.compile(
             r"tên tôi|tôi tên|tôi tên gì|tôi bao nhiêu tuổi|tuổi tôi|"
@@ -217,6 +216,11 @@ class MicroLLM:
                 if sc > bs:
                     bs, best = sc, s
             return f"Theo những gì tôi đã học: {best}" + ("." if not best.endswith(".") else "")
+
+        # "nhớ: ..."
+        m = re.match(r"^(nhớ|ghi nhớ|note|học)\s*[:\-]?\s*(.+)$", user_msg, re.I)
+        if m:
+            return f"✅ Đã ghi nhớ: '{m.group(2).strip()}'."
 
         # câu hỏi
         if user_msg.endswith("?") or any(low.startswith(k) for k in ["tại sao","vì sao","làm sao","như thế nào","gì","ai","ở đâu","bao nhiêu"]):
@@ -327,13 +331,8 @@ class MicroLLM:
     def _rewrite(self, prompt):
         m_ans = re.search(r"\[ANSWER\](.*?)\[/ANSWER\]", prompt, re.S)
         m_cri = re.search(r"\[CRITIQUE\](.*?)\[/CRITIQUE\]", prompt, re.S)
-        ans = m_ans.group(1).strip() if m_ans else ""
+        ans = m_ans.group(1).strip() if m_ans else prompt
         cri = m_cri.group(1) if m_cri else ""
-        # Nếu không có structured tag (trường hợp micro brain được gọi trực tiếp
-        # từ chat() với prompt chứa [WORKSPACE]), fallback sang _answer để sinh
-        # câu trả lời thực thay vì echo nguyên prompt.
-        if not ans:
-            return self._answer(prompt)
         # Heuristic rewrite: cắt bớt phần thừa
         lines = [l for l in ans.split("\n") if l.strip()]
         if lines:
@@ -392,12 +391,14 @@ class MicroLLM:
 
 # ---------------- BRAIN CHUNG ----------------
 class Brain:
-    def __init__(self, force_micro=False, model=None):
+    def __init__(self, force_micro=False, model=None, language=None, profile=None):
         self.models = ollama_list()
         self.backend = "micro"
         self.model = model or DEFAULT_OLLAMA
         self.micro = MicroLLM()
-        self.temperature = DEFAULT_TEMPERATURE
+        self.temperature = 0.5
+        self.language = normalize_language(language or os.environ.get("CLARA_LANGUAGE"), default="vi")
+        self.profile = profile or os.environ.get("CLARA_PROFILE", "mobile_12gb_safe")
         if not force_micro and self.models is not None:
             names = [m.get("name","") for m in self.models]
             for cand in [self.model] + CANDIDATE_MODELS:
@@ -406,65 +407,66 @@ class Brain:
                     self.backend = "ollama"
                     break
 
+    def _ollama_options(self, temperature=None, num_predict=None):
+        try:
+            from runtime_profile import choose_profile
+            p = choose_profile(self.profile)
+            return {
+                "temperature": temperature if temperature is not None else self.temperature,
+                "num_predict": num_predict or p.completion_default,
+                "top_p": 0.9,
+                "seed": -1,
+            }
+        except Exception:
+            return {
+                "temperature": temperature if temperature is not None else self.temperature,
+                "num_predict": num_predict or 384,
+                "top_p": 0.9,
+                "seed": -1,
+            }
+
     def think(self, tag, prompt, **kw):
         t = kw.get("temperature", self.temperature)
-        num_predict = kw.get("num_predict", DEFAULT_NUM_PREDICT)
-        out = ""
+        sys_prompt = self._tag_to_system(tag)
         if self.backend == "ollama":
-            sys_prompt = self._tag_to_system(tag)
             messages = [
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": prompt},
             ]
             try:
                 out = ollama_chat_messages(messages, model=self.model, temperature=t,
-                                           num_predict=num_predict) or ""
+                                           num_predict=kw.get("num_predict", 400),
+                                           options=self._ollama_options(t, kw.get("num_predict", 400))) or ""
+            except TypeError:
+                out = ollama_chat_messages(messages, model=self.model, temperature=t,
+                                           num_predict=kw.get("num_predict", 400)) or ""
             except Exception:
                 out = ""
             if not out:
                 try:
                     out = ollama_chat(f"{sys_prompt}\n{prompt}", model=self.model, temperature=t,
-                                      num_predict=num_predict)
+                                      num_predict=kw.get("num_predict", 400))
                 except Exception as e:
                     out = f"[ollama lỗi: {e}]\n"
         elif self.backend == "openai":
-            sys_prompt = self._tag_to_system(tag)
             full = f"{sys_prompt}\n{prompt}"
             try:
                 out = openai_chat(full, model=self.model, temperature=t,
-                                  num_predict=num_predict)
+                                  num_predict=kw.get("num_predict", 400))
             except Exception as e:
                 out = f"[openai lỗi: {e}]\n"
+        else:
+            out = ""
         out = strip_think(out)
         if out and len(out.strip()) > 2:
             return out.strip()
         return self.micro.think(tag, prompt)
 
     def _tag_to_system(self, tag):
-        mapping = {
-            T_PLAN:    ("Bạn là bộ phận lên kế hoạch của một agent AGI-like. "
-                        "Hãy phân tích yêu cầu người dùng và trả về DUY NHẤT một đối tượng JSON hợp lệ "
-                        "với các khóa: steps (mảng các bước ngắn), needs_tool (boolean), "
-                        "tool_name (string: calc/read/write/list/run_python/search/now/none), "
-                        "tool_args (string: các tham số cho tool, vd '15 * (2+3)' cho calc). Không trả về gì khác ngoài JSON."),
-            T_TOOL:    ("Dựa trên kế hoạch trên, hãy chọn công cụ phù hợp nhất. "
-                        "Trả về DUY NHẤT một dòng: '<tool_name> <args>'. "
-                        "Ví dụ: 'calc 15*(2+3)' hoặc 'read note.txt' hoặc 'none'."),
-            T_REFLECT: ("Bạn là module tự phản tỉnh. Hãy phê bình câu trả lời sau (tìm lỗi, chỗ yếu, chỗ quá chung chung) "
-                        "và cho điểm trên thang 10. Trả lời ngắn gọn."),
-            T_REWRITE: ("Dựa trên lời phê bình, hãy viết LẠI câu trả lời sao cho tốt hơn. "
-                        "Chỉ trả về câu trả lời mới bằng tiếng Việt, ngắn gọn (2-4 câu), không giải thích thêm."),
-            T_ANSWER:  ("Bạn là CLARA-AGI, tác nhân tự chủ chạy local. "
-                        "Dùng thông tin trong WORKSPACE và kết quả công cụ để trả lời người dùng bằng tiếng Việt, "
-                        "tự nhiên, ngắn gọn (2-5 câu). Thành thật khi không biết, không bịa đặt."),
-            T_SKILL:   ("Từ lỗi/mistake sau, hãy đề xuất một skill (thủ tục) mới dưới dạng JSON: "
-                        "{\"name\":\"...\",\"description\":\"...\",\"steps\":[...]}. steps là mảng câu ngắn mô tả cách xử lý đúng."),
-            T_DREAM:   ("Bạn là module tổng hợp khi 'ngủ'. Hãy đọc các episode gần đây, rút ra 2-3 bài học ngắn, "
-                        "trả về JSON {\"summary\":\"...\",\"lessons\":[...]}. Tiếng Việt."),
-        }
-        return mapping.get(tag, "Trả lời ngắn gọn bằng tiếng Việt.")
+        return system_for(tag, language=self.language)
 
     def status(self):
         return {"backend": self.backend,
                 "model": self.model if self.backend == "ollama" else "micro-template",
-                "available_models": [m.get("name") for m in (self.models or [])][:10]}
+                "available_models": [m.get("name") for m in (self.models or [])][:10],
+                "language": getattr(self, "language", "vi")}
