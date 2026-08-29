@@ -21,3 +21,7 @@ logs/
 owner_identity.local.json
 # Self-upgrade persistent daily counter (runtime state, regenerated per machine)
 data/self_upgrade_state.json
+
+# Owner policy — chỉ chứa placeholder/id ẩn danh khi chạy, nhưng để an toàn lâu dài
+# (tránh lọt PII nếu ai điền thật) thì coi như local-only, không track trên public repo.
+owner_policy.json
