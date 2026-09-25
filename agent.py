@@ -1,5 +1,5 @@
 """
-CLARA-AGI v1.4 - Global Workspace Agent (9-step cognitive cycle).
+CLARA-AGI v1.5 - Global Workspace Agent (9-step cognitive cycle + Reasoning Engine).
 """
 import re, json, time, math, random
 from pathlib import Path
@@ -7,6 +7,8 @@ from version import __version__
 from memory import Memory
 from brain import Brain, T_ANSWER, T_PLAN, T_TOOL, T_REFLECT, T_REWRITE, T_SKILL, T_DREAM
 from tools import parse_and_dispatch
+from reasoning import ReasoningEngine, quick_reason
+from planner import Planner, Plan
 
 try:
     from scheduler import attach_study_commands, StudyScheduler
@@ -46,6 +48,19 @@ class ClarasAGI:
         self.allow_network = allow_network
         if _HAS_SCHEDULER:
             attach_study_commands(self)
+        
+        # Register tools (defined in tools.py)
+        from tools import register_tools
+        self.tools = register_tools(self)
+        # Reasoning engine (lazy import để tránh circular)
+        self._reasoning_engine = None
+
+    @property
+    def reasoning_engine(self):
+        if self._reasoning_engine is None:
+            from reasoning import ReasoningEngine
+            self._reasoning_engine = ReasoningEngine(self)
+        return self._reasoning_engine
 
     # ------------------ CORE CYCLE ------------------
     def chat(self, user_text: str) -> str:
@@ -111,89 +126,18 @@ class ClarasAGI:
         uncertainty = min(1.0, uncertainty + curiosity_bonus - (0.1 if procs else 0))
         self.wm.append({"role": "uncertainty", "content": uncertainty})
 
-        # 4. PLAN
-        plan_prompt = f"Người dùng nói: {text}\n[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]"
-        plan_raw = self.brain.think(T_PLAN, plan_prompt, temperature=0.3)
-        plan = self._parse_plan(plan_raw)
-        self.wm.append({"role": "plan", "content": plan})
+        # 4. PLAN & EXECUTE (NEW: Reasoning Engine for multi-step tasks)
+        # Determine if this is a complex task needing multi-step reasoning
+        is_complex = self._is_complex_task(text)
+        
+        if is_complex:
+            # Use ReasoningEngine for full plan→act→observe→reflect loop
+            answer, tool_used, tool_result = self._reasoning_loop(text, emotion, uncertainty)
+        else:
+            # Original single-step flow for simple queries
+            answer, tool_used, tool_result = self._simple_loop(text, emotion, uncertainty)
 
-        # 5-6. TOOL + ACT
-        tool_result = ""
-        tool_used = "none"
-        tool_args = plan.get("tool_args") or ""
-        if plan.get("needs_tool") and tool_args and tool_args != "none":
-            try:
-                tool_result = parse_and_dispatch(self, tool_args)
-                tool_used = plan.get("tool_name", tool_args.split()[0])
-                self.mem.use_procedure("use_tool", success=("❌" not in tool_result and "Lỗi" not in tool_result))
-            except Exception as e:
-                tool_result = f"❌ Lỗi khi dùng tool: {e}"
-            self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-
-        if tool_used == "none":
-            forced = self._forced_tool(text)
-            if forced:
-                try:
-                    tool_result = parse_and_dispatch(self, forced)
-                    tool_used = forced.split()[0]
-                    self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-                except Exception as e:
-                    tool_result = f"❌ {e}"
-
-        if tool_used == "none":
-            retry_prompt = (
-                f"Người dùng yêu cầu dùng tool: {text}\n"
-                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
-                "Chỉ trả về MỘT dòng: '<tool_name> <args>' hoặc 'none'. Bắt đầu bằng: calc/read/write/list/run_python/search/now."
-            )
-            retry_raw = self.brain.think("__TOOL__", retry_prompt, temperature=0.1, num_predict=120)
-            m = re.search(r"^(calc|read|write|list|run_python|search|now|help|none)\s+(.*)", retry_raw.strip(), re.S | re.I)
-            if m:
-                try:
-                    tool_result = parse_and_dispatch(self, m.group(0).strip())
-                    tool_used = m.group(1).lower()
-                    self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-                except Exception as e:
-                    tool_result = f"❌ {e}"
-
-        for _ in range(2):
-            if tool_used == "none":
-                break
-            next_prompt = (
-                f"Người dùng: {text}\n"
-                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
-                f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
-                "Nếu kết quả công cụ trên chưa đủ để trả lời, hãy chọn công cụ tiếp theo cần thiết. "
-                "Chỉ trả về MỘT dòng: '<tool_name> <args>' hoặc 'none'."
-            )
-            next_raw = self.brain.think("__TOOL__", next_prompt, temperature=0.1, num_predict=120)
-            m = re.search(r"^(calc|read|write|list|run_python|search|now|help|none)\s+(.*)", next_raw.strip(), re.S | re.I)
-            if not m:
-                break
-            next_tool = m.group(1).lower()
-            next_args = m.group(2).strip()
-            if next_tool == "none":
-                break
-            try:
-                tool_result = parse_and_dispatch(self, f"{next_tool} {next_args}")
-                tool_used = next_tool
-                self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
-            except Exception as e:
-                tool_result = f"❌ {e}"
-                tool_used = "none"
-                break
-
-        # 7. ANSWER
-        ans_prompt = (
-            f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False, indent=2)}[/WORKSPACE]\n"
-            f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
-            f"Người dùng: {text}\n"
-            "Hãy trả lời tiếng Việt ngắn gọn, tự nhiên, 2-5 câu."
-        )
-        answer = self.brain.think(T_ANSWER, ans_prompt, temperature=0.5)
-        answer = self._clean(answer)
-
-        # 8. REFLECT
+        # 8. REFLECT (on final answer)
         ref_prompt = (
             f"[USER]{text}[/USER]\n"
             f"[ANSWER]{answer}[/ANSWER]\n"
@@ -240,7 +184,7 @@ class ClarasAGI:
         elapsed = (time.time() - start) * 1000
         status = self.brain.status()["backend"]
         sure = int((1 - uncertainty) * 100)
-        foot = f"\n\n⏱️ {elapsed:.0f}ms · 🧠 {status} · chấc {sure}%"
+        foot = f"\n\n⏱️ {elapsed:.0f}ms · 🧠 {status} · chắc {sure}%"
         if rewritten:
             foot += " · 💭 tự sửa sau phản tỉnh"
         if dream_note:
@@ -497,6 +441,152 @@ class ClarasAGI:
             return run_income_portfolio(self, text)
         except Exception as e:
             return f"❌ Lỗi income_portfolio: {e}"
+
+    def _is_complex_task(self, text: str) -> bool:
+        """Xác định xem task có phức tạp cần multi-step reasoning không."""
+        low = text.lower().strip()
+
+        # Complex indicators — nghiên cứu, phân tích, lập kế hoạch, tổng hợp
+        complex_patterns = [
+            r"tìm.*tóm tắt",          # tìm và tóm tắt
+            r"nghiên cứu",            # nghiên cứu
+            r"so sánh",               # so sánh
+            r"phân tích",             # phân tích
+            r"báo cáo",               # báo cáo
+            r"lập kế hoạch",          # lập kế hoạch
+            r"bước.*bước",            # từng bước
+            r"tự động.*học",          # tự động học
+            r"tạo.*skill",            # tạo skill
+            r"nâng cấp",              # nâng cấp
+            r"tối ưu.*hóa",           # tối ưu hóa
+            r"debug.*sửa",            # debug sửa
+            r"review.*code",          # review code
+            r"kiểm tra.*compliance",  # kiểm tra compliance
+            r"income.*roadmap",       # income roadmap
+            r"cơ hội.*thu nhập",      # cơ hội thu nhập
+            r"portfolio",             # portfolio
+            r"tóm tắt",               # tóm tắt
+            r"total|sum|tính.*tổng",  # tính tổng
+        ]
+
+        # Multiple tool indicators
+        multi_tool = sum(1 for kw in ["search", "read", "write", "calc", "run_python", "list", "now"]
+                        if kw in low)
+
+        # Question words + length
+        is_question = any(w in low for w in ["?", "gì", "sao", "nhỉ", "không", "ở đâu", "bao nhiêu", "khi nào", "tại sao"])
+        long_query = len(text) > 80
+
+        for pattern in complex_patterns:
+            if re.search(pattern, low):
+                return True
+
+        return multi_tool >= 2 or (is_question and long_query)
+
+    def _reasoning_loop(self, text: str, emotion: float, uncertainty: float):
+        """Multi-step reasoning using ReasoningEngine (Planner + DAG execution)."""
+        engine = self.reasoning_engine  # lazy property
+        result = engine.think(text)
+
+        # Extract answer, tool_used, tool_result from trace
+        answer = result.final_result or "Đã hoàn thành reasoning."
+        tool_used = "reasoning_engine"
+        tool_result = json.dumps({
+            "steps_executed": len([s for s in result.steps if s.status.value == "done"]),
+            "total_steps": len(result.steps),
+            "iterations": result.iterations,
+        }, ensure_ascii=False)
+
+        # Add reasoning trace to workspace
+        self.wm.append({"role": "reasoning_trace", "content": result.to_dict()})
+
+        return answer, tool_used, tool_result
+
+    def _simple_loop(self, text: str, emotion: float, uncertainty: float):
+        """Original single-step flow for simple queries."""
+        # 4. PLAN
+        plan_prompt = f"Người dùng nói: {text}\n[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]"
+        plan_raw = self.brain.think(T_PLAN, plan_prompt, temperature=0.3)
+        plan = self._parse_plan(plan_raw)
+        self.wm.append({"role": "plan", "content": plan})
+
+        # 5-6. TOOL + ACT
+        tool_result = ""
+        tool_used = "none"
+        tool_args = plan.get("tool_args") or ""
+        if plan.get("needs_tool") and tool_args and tool_args != "none":
+            try:
+                tool_result = parse_and_dispatch(self, tool_args)
+                tool_used = plan.get("tool_name", tool_args.split()[0])
+                self.mem.use_procedure("use_tool", success=("❌" not in tool_result and "Lỗi" not in tool_result))
+            except Exception as e:
+                tool_result = f"❌ Lỗi khi dùng tool: {e}"
+            self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
+
+        if tool_used == "none":
+            forced = self._forced_tool(text)
+            if forced:
+                try:
+                    tool_result = parse_and_dispatch(self, forced)
+                    tool_used = forced.split()[0]
+                    self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
+                except Exception as e:
+                    tool_result = f"❌ {e}"
+
+        if tool_used == "none":
+            retry_prompt = (
+                f"Người dùng yêu cầu dùng tool: {text}\n"
+                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
+                "Chỉ trả về MỘT dòng: '<tool_name> <args>' hoặc 'none'. Bắt đầu bằng: calc/read/write/list/run_python/search/now."
+            )
+            retry_raw = self.brain.think("__TOOL__", retry_prompt, temperature=0.1, num_predict=120)
+            m = re.search(r"^(calc|read|write|list|run_python|search|now|help|none)\s+(.*)", retry_raw.strip(), re.S | re.I)
+            if m:
+                try:
+                    tool_result = parse_and_dispatch(self, m.group(0).strip())
+                    tool_used = m.group(1).lower()
+                    self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
+                except Exception as e:
+                    tool_result = f"❌ {e}"
+
+        for _ in range(2):
+            if tool_used == "none":
+                break
+            next_prompt = (
+                f"Người dùng: {text}\n"
+                f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False)}[/WORKSPACE]\n"
+                f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
+                "Nếu kết quả công cụ trên chưa đủ để trả lời, hãy chọn công cụ tiếp theo cần thiết. "
+                "Chỉ trả về MỘT dòng: '<tool_name> <args>' hoặc 'none'."
+            )
+            next_raw = self.brain.think("__TOOL__", next_prompt, temperature=0.1, num_predict=120)
+            m = re.search(r"^(calc|read|write|list|run_python|search|now|help|none)\s+(.*)", next_raw.strip(), re.S | re.I)
+            if not m:
+                break
+            next_tool = m.group(1).lower()
+            next_args = m.group(2).strip()
+            if next_tool == "none":
+                break
+            try:
+                tool_result = parse_and_dispatch(self, f"{next_tool} {next_args}")
+                tool_used = next_tool
+                self.wm.append({"role": "tool", "name": tool_used, "result": tool_result[:600]})
+            except Exception as e:
+                tool_result = f"❌ {e}"
+                tool_used = "none"
+                break
+
+        # 7. ANSWER
+        ans_prompt = (
+            f"[WORKSPACE]{json.dumps(self._compact_wm(), ensure_ascii=False, indent=2)}[/WORKSPACE]\n"
+            f"[TOOL_RESULT]{tool_result or 'không dùng'}[/TOOL_RESULT]\n"
+            f"Người dùng: {text}\n"
+            "Hãy trả lời tiếng Việt ngắn gọn, tự nhiên, 2-5 câu."
+        )
+        answer = self.brain.think(T_ANSWER, ans_prompt, temperature=0.5)
+        answer = self._clean(answer)
+        
+        return answer, tool_used, tool_result
 
     def _help_text(self):
         s = self.status()

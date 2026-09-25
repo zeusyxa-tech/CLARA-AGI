@@ -53,3 +53,8 @@
 {"action": "learn", "topic": "user_preference", "fact": "Người dùng ghét mùa đông", "source": "user_taught", "confidence": 0.8, "detail": null, "ts": 1787480069.278134}
 {"action": "learn", "topic": "user_statement", "fact": "tôi thích ở quê", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1787480069.3182015}
 {"action": "learn", "topic": "user_location", "fact": "Người dùng ở quê", "source": "user_taught", "confidence": 0.75, "detail": null, "ts": 1787480069.3185263}
+{"action": "deny", "file": "Self_Upgrade.py", "reason": "không nằm trong allowlist", "ts": 1788223163.8336043, "engine": "self_upgrade"}
+{"action": "deny", "file": "tools.py", "reason": "nằm trong DENYLIST cứng (tools.py)", "ts": 1788223163.8338614, "engine": "self_upgrade"}
+{"action": "deny", "file": "tools.py", "reason": "nằm trong DENYLIST cứng (tools.py)", "ts": 1788223289.9875257, "engine": "self_upgrade"}
+{"action": "deny", "file": "tools.py", "reason": "nằm trong DENYLIST cứng (tools.py)", "ts": 1788223289.9882543, "engine": "self_upgrade"}
+{"action": "learn", "topic": "user_statement", "fact": "bạn là ai", "source": "user_taught", "confidence": 0.7, "detail": null, "ts": 1790301260.02914}

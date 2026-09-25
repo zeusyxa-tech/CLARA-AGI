@@ -89,6 +89,9 @@ SECURITY_MARKERS = [
     re.compile(r"enabled\s*=\s*True", re.I),
     re.compile(r"self\.enabled", re.I),
     re.compile(r"SelfUpgradeLoop\(", re.I),
+    # --- Chặn gán lại thuộc tính module bị cấm (qua patch vào file được phép) ---
+    # Ví dụ: tools.tool_calc = lambda *a: ..., webui.main = ..., web_tools.fetch = ...
+    re.compile(r"\b(tools|web_tools|webui)\s*\.\s*\w+\s*=", re.I),
 ]
 
 # Đánh giá rủi ro: file càng lõi càng cần thận trọng
